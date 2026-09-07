@@ -3294,111 +3294,74 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 </script>
 
 <script>
-/* V102 Excel/CSV failsafe: works even if the external XLSX library is unavailable. */
+/* V103: self-contained XLSX reader. No CDN/library is needed for .xlsx upload. */
 (function(){
-  function csvEscape(v){
-    return '"' + String(v ?? '').replace(/"/g,'""') + '"';
-  }
-  function downloadCSV(){
-    const headers = ['Admission No','Student Name','Class','Gender','DOB','Father Name','Mother Name','Mobile','Samagra ID','Aadhaar','Address'];
-    const row = ['1001','Example Student','6','Male','12/05/2014','Father Name','Mother Name','9876543210','','','Village / City'];
-    const csv = '\ufeff' + headers.map(csvEscape).join(',') + '\r\n' + row.map(csvEscape).join(',');
-    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'Nikhat_Middle_School_Student_Template.csv';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1500);
-  }
   function parseCSV(text){
-    text = String(text || '').replace(/^\ufeff/,'');
-    const rows=[], row=[]; let cell='', quoted=false;
-    for(let i=0;i<text.length;i++){
-      const c=text[i], n=text[i+1];
-      if(quoted){
-        if(c==='"' && n==='"'){ cell+='"'; i++; }
-        else if(c==='"') quoted=false;
-        else cell+=c;
-      }else{
-        if(c==='"') quoted=true;
-        else if(c===','){ row.push(cell); cell=''; }
-        else if(c==='\n'){ row.push(cell); rows.push(row.splice(0)); cell=''; }
-        else if(c!=='\r') cell+=c;
-      }
-    }
-    if(cell!=='' || row.length){ row.push(cell); rows.push(row); }
-    if(!rows.length) return [];
-    const headers=rows[0];
-    return rows.slice(1).filter(r=>r.some(x=>String(x).trim()!=='')).map(r=>{
-      const o={}; headers.forEach((h,i)=>o[h]=(r[i]??'').trim()); return o;
-    });
+    text=String(text||'').replace(/^\ufeff/,'');
+    const rows=[],row=[];let cell='',quoted=false;
+    for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(quoted){if(c==='"'&&n==='"'){cell+='"';i++;}else if(c==='"')quoted=false;else cell+=c;}else{if(c==='"')quoted=true;else if(c===','){row.push(cell);cell='';}else if(c==='\n'){row.push(cell);rows.push(row.splice(0));cell='';}else if(c!=='\r')cell+=c;}}
+    if(cell!==''||row.length){row.push(cell);rows.push(row);}if(!rows.length)return [];
+    const headers=rows[0];return rows.slice(1).filter(r=>r.some(x=>String(x).trim()!=='')).map(r=>{const o={};headers.forEach((h,i)=>o[h]=(r[i]??'').trim());return o;});
   }
-  function handleFile(input){
-    const f=input.files && input.files[0];
-    if(!f) return;
-    const status=document.getElementById('bulkUploadStatus');
-    if(status) status.textContent='File read ho rahi hai...';
+  function u16(v,p){return v.getUint16(p,true)} function u32(v,p){return v.getUint32(p,true)}
+  async function inflateRaw(bytes){
+    if(typeof DecompressionStream==='undefined') throw new Error('Browser me XLSX decompression support nahi hai. Microsoft Edge/Chrome ka latest version use karein.');
+    const ds=new DecompressionStream('deflate-raw');
+    const ab=await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+    return new Uint8Array(ab);
+  }
+  async function readZip(buf){
+    const b=new Uint8Array(buf),dv=new DataView(buf);let eocd=-1;
+    for(let p=b.length-22;p>=Math.max(0,b.length-65557);p--){if(u32(dv,p)===0x06054b50){eocd=p;break;}}
+    if(eocd<0)throw new Error('XLSX ZIP structure nahi mili.');
+    const count=u16(dv,eocd+10),cdSize=u32(dv,eocd+12),cdOff=u32(dv,eocd+16);let p=cdOff;const out={};
+    const td=new TextDecoder('utf-8');
+    for(let i=0;i<count;i++){
+      if(u32(dv,p)!==0x02014b50)throw new Error('Invalid XLSX ZIP entry.');
+      const method=u16(dv,p+10),csize=u32(dv,p+20),nlen=u16(dv,p+28),xlen=u16(dv,p+30),clen=u16(dv,p+32),off=u32(dv,p+42);
+      const name=td.decode(b.slice(p+46,p+46+nlen));p+=46+nlen+xlen+clen;
+      if(!name||name.endsWith('/'))continue;
+      const lp=off;if(u32(dv,lp)!==0x04034b50)continue;const ln=u16(dv,lp+26),lx=u16(dv,lp+28),start=lp+30+ln+lx;
+      const raw=b.slice(start,start+csize);out[name]=method===0?raw:await inflateRaw(raw);
+    }
+    return out;
+  }
+  function xml(bytes){return new DOMParser().parseFromString(new TextDecoder('utf-8').decode(bytes),'application/xml');}
+  function txt(node){return Array.from(node.querySelectorAll('t')).map(x=>x.textContent||'').join('');}
+  function colNum(ref){let m=String(ref).match(/^[A-Z]+/i);if(!m)return 0;let n=0;for(const c of m[0].toUpperCase())n=n*26+c.charCodeAt(0)-64;return n-1;}
+  async function parseXLSX(buf){
+    const z=await readZip(buf), wb=xml(z['xl/workbook.xml']);
+    let rels={}; if(z['xl/_rels/workbook.xml.rels']){const r=xml(z['xl/_rels/workbook.xml.rels']);r.querySelectorAll('Relationship').forEach(x=>{rels[x.getAttribute('Id')]=x.getAttribute('Target');});}
+    const shared=[]; if(z['xl/sharedStrings.xml']){const s=xml(z['xl/sharedStrings.xml']);s.querySelectorAll('si').forEach(x=>shared.push(txt(x)));}
+    const sheet=wb.querySelector('sheet'); if(!sheet)throw new Error('Workbook me sheet nahi mili.');
+    const rid=sheet.getAttribute('r:id'); let target=rels[rid]||''; if(target.startsWith('/'))target=target.slice(1); if(target.startsWith('xl/')){}else target='xl/'+target.replace(/^\.\//,'');
+    const sb=z[target]; if(!sb)throw new Error('First worksheet nahi mili.');
+    const doc=xml(sb), rows=[];
+    doc.querySelectorAll('sheetData > row').forEach(r=>{
+      const cells=[];r.querySelectorAll(':scope > c').forEach(c=>{const ref=c.getAttribute('r')||'';const idx=colNum(ref);let v='';const typ=c.getAttribute('t');
+        if(typ==='inlineStr')v=txt(c);else{const vn=c.querySelector(':scope > v');v=vn?vn.textContent||'':'';if(typ==='s'){const i=Number(v);v=Number.isFinite(i)&&shared[i]!=null?shared[i]:'';}else if(typ==='b')v=v==='1'?'TRUE':'FALSE';}
+        cells[idx]=v;});rows.push(cells);});
+    if(!rows.length)return [];
+    let head=rows[0]||[];let width=head.length;rows.forEach(r=>{width=Math.max(width,r.length)});
+    head=Array.from({length:width},(_,i)=>String(head[i]??'').trim());
+    return rows.slice(1).filter(r=>r.some(x=>String(x??'').trim()!=='')).map(r=>{const o={};head.forEach((h,i)=>{if(h)o[h]=String(r[i]??'').trim();});return o;});
+  }
+  async function handle(input){
+    const f=input.files&&input.files[0];if(!f)return;const status=document.getElementById('bulkUploadStatus');if(status)status.textContent='Excel file read ho rahi hai...';
     const ext=(f.name.split('.').pop()||'').toLowerCase();
-
-    if((ext==='xlsx'||ext==='xls') && window.XLSX){
-      f.arrayBuffer().then(function(buf){
-        const wb=XLSX.read(buf,{type:'array'});
-        const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-        if(!raw.length) throw new Error('File me data rows nahi mili');
-        const mapped=raw.map(bulkMap), res=validateBulk(mapped);
-        showBulk(res,raw.length);
-        if(status) status.textContent=raw.length+' rows read successfully.';
-      }).catch(function(err){
-        if(status) status.textContent='Excel read nahi ho saki.';
-        alert('Excel file read nahi ho saki. CSV format use karke try karein.\n\n'+(err.message||err));
-      });
-      input.value='';
-      return;
-    }
-
-    if(ext==='csv'){
-      f.text().then(function(text){
-        const raw=parseCSV(text);
-        if(!raw.length) throw new Error('File me data rows nahi mili');
-        const mapped=raw.map(bulkMap), res=validateBulk(mapped);
-        showBulk(res,raw.length);
-        if(status) status.textContent=raw.length+' rows read successfully.';
-      }).catch(function(err){
-        if(status) status.textContent='CSV read nahi ho saki.';
-        alert('CSV file read nahi ho saki.\n\n'+(err.message||err));
-      });
-    }else{
-      if(status) status.textContent='CSV choose karein. Excel (.xlsx) ke liye internet/XLSX library zaroori hai.';
-      alert('Filhaal CSV file choose karein. CSV ko Microsoft Excel me khola aur save kiya ja sakta hai.');
-    }
+    try{
+      let raw;
+      if(ext==='xlsx') raw=await parseXLSX(await f.arrayBuffer());
+      else if(ext==='csv') raw=parseCSV(await f.text());
+      else throw new Error('Sirf .xlsx ya .csv file supported hai. Purani .xls file ko Excel me Save As → .xlsx karke upload karein.');
+      if(!raw.length)throw new Error('File me data rows nahi mili.');
+      const mapped=raw.map(bulkMap),res=validateBulk(mapped);showBulk(res,raw.length);if(status)status.textContent=raw.length+' rows read successfully.';
+    }catch(err){if(status)status.textContent='File read nahi ho saki.';alert('Excel/CSV file read nahi ho saki.\n\n'+(err.message||err));}
     input.value='';
   }
-
-  function bind(){
-    const btn=document.getElementById('downloadStudentTemplate');
-    const input=document.getElementById('studentBulkFile');
-    if(btn){
-      btn.onclick=function(e){
-        e.preventDefault();
-        try{
-          if(window.XLSX){
-            const rows=[{'Admission No':'1001','Student Name':'Example Student','Class':'6','Gender':'Male','DOB':'12/05/2014','Father Name':'Father Name','Mother Name':'Mother Name','Mobile':'9876543210','Samagra ID':'','Aadhaar':'','Address':'Village / City'}];
-            const wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(rows);
-            XLSX.utils.book_append_sheet(wb,ws,'Students');
-            XLSX.writeFile(wb,'Nikhat_Middle_School_Student_Template.xlsx');
-          }else{
-            downloadCSV();
-          }
-        }catch(err){ downloadCSV(); }
-      };
-    }
-    if(input) input.onchange=function(){ handleFile(input); };
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind);
-  else bind();
+  function bind(){const input=document.getElementById('studentBulkFile');if(input)input.onchange=function(){handle(input)};}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 })();
 </script>
+
 </body></html>
