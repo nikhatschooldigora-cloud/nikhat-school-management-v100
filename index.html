@@ -5430,4 +5430,40 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   document.addEventListener('click',handler,true);
 })();
 </script>
+<script>
+/* V106: Bulk Student controls are bound OUTSIDE print-preview templates. */
+(function(){
+  function q(id){return document.getElementById(id);}
+  function csvTemplate(){
+    const rows=[['Admission No','Student Name','Class','Gender','DOB','Father Name','Mother Name','Mobile','Samagra ID','Aadhaar','Address'],['1001','Example Student','6','Male','12/05/2014','Father Name','Mother Name','9876543210','','','Village / City']];
+    const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='Nikhat_Middle_School_Student_Template.csv'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+  }
+  function download(){
+    try{
+      const raw=atob('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'); const u=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++)u[i]=raw.charCodeAt(i);
+      const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([u],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download='Nikhat_Middle_School_Student_Template.xlsx'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+      const st=q('bulkUploadStatus'); if(st)st.textContent='Excel template downloaded successfully.';
+    }catch(e){console.error(e);csvTemplate();}
+  }
+  function cancel(){
+    try{ if(typeof bulkRows!=='undefined') bulkRows=[]; }catch(e){}
+    const w=q('bulkPreviewWrap'); if(w)w.style.display='none'; const i=q('studentBulkFile'); if(i)i.value=''; const st=q('bulkUploadStatus'); if(st)st.textContent='Upload cancelled.';
+  }
+  function importRows(){
+    let rows=[]; try{rows=(typeof bulkRows!=='undefined'&&Array.isArray(bulkRows))?bulkRows:[];}catch(e){}
+    if(!rows.length){alert('Import karne ke liye valid students nahi hain.');return;}
+    try{
+      if(typeof students==='undefined'||!Array.isArray(students)) throw new Error('Student database ready nahi hai.');
+      rows.forEach(r=>students.push({id:(typeof uid==='function'?uid():'stu_'+Date.now()+Math.random()),adm:r.admissionNo,name:r.name,cls:r.className,gender:r.gender||'',dob:r.dob||'',father:r.father||'',mother:r.mother||'',mobile:r.mobile||'',samagra:r.samagra||'',aadhaar:r.aadhaar||'',address:r.address||'',photo:''}));
+      if(typeof save==='function')save(); if(typeof renderStudents==='function')renderStudents(); if(typeof renderClasses==='function')renderClasses(); if(typeof updateDash==='function')updateDash();
+      const n=rows.length; if(typeof bulkRows!=='undefined')bulkRows=[]; const w=q('bulkPreviewWrap');if(w)w.style.display='none'; const i=q('studentBulkFile');if(i)i.value=''; const st=q('bulkUploadStatus');if(st)st.textContent=n+' students successfully imported.'; alert(n+' student(s) successfully imported.');
+    }catch(e){console.error(e);alert('Import nahi ho saka.\n\n'+(e.message||e));}
+  }
+  document.addEventListener('click',function(e){
+    const el=e.target&&e.target.closest?e.target.closest('#downloadStudentTemplate,#bulkCancel,#bulkImport'):null; if(!el)return; e.preventDefault(); e.stopImmediatePropagation();
+    if(el.id==='downloadStudentTemplate')download(); else if(el.id==='bulkCancel')cancel(); else importRows();
+  },true);
+})();
+</script>
 </body></html>
