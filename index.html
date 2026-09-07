@@ -3292,4 +3292,113 @@ function bind(){ $('v100Run')?.addEventListener('click',run); $('v100Print')?.ad
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 })();
 </script>
+
+<script>
+/* V102 Excel/CSV failsafe: works even if the external XLSX library is unavailable. */
+(function(){
+  function csvEscape(v){
+    return '"' + String(v ?? '').replace(/"/g,'""') + '"';
+  }
+  function downloadCSV(){
+    const headers = ['Admission No','Student Name','Class','Gender','DOB','Father Name','Mother Name','Mobile','Samagra ID','Aadhaar','Address'];
+    const row = ['1001','Example Student','6','Male','12/05/2014','Father Name','Mother Name','9876543210','','','Village / City'];
+    const csv = '\ufeff' + headers.map(csvEscape).join(',') + '\r\n' + row.map(csvEscape).join(',');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Nikhat_Middle_School_Student_Template.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }
+  function parseCSV(text){
+    text = String(text || '').replace(/^\ufeff/,'');
+    const rows=[], row=[]; let cell='', quoted=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i], n=text[i+1];
+      if(quoted){
+        if(c==='"' && n==='"'){ cell+='"'; i++; }
+        else if(c==='"') quoted=false;
+        else cell+=c;
+      }else{
+        if(c==='"') quoted=true;
+        else if(c===','){ row.push(cell); cell=''; }
+        else if(c==='\n'){ row.push(cell); rows.push(row.splice(0)); cell=''; }
+        else if(c!=='\r') cell+=c;
+      }
+    }
+    if(cell!=='' || row.length){ row.push(cell); rows.push(row); }
+    if(!rows.length) return [];
+    const headers=rows[0];
+    return rows.slice(1).filter(r=>r.some(x=>String(x).trim()!=='')).map(r=>{
+      const o={}; headers.forEach((h,i)=>o[h]=(r[i]??'').trim()); return o;
+    });
+  }
+  function handleFile(input){
+    const f=input.files && input.files[0];
+    if(!f) return;
+    const status=document.getElementById('bulkUploadStatus');
+    if(status) status.textContent='File read ho rahi hai...';
+    const ext=(f.name.split('.').pop()||'').toLowerCase();
+
+    if((ext==='xlsx'||ext==='xls') && window.XLSX){
+      f.arrayBuffer().then(function(buf){
+        const wb=XLSX.read(buf,{type:'array'});
+        const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+        if(!raw.length) throw new Error('File me data rows nahi mili');
+        const mapped=raw.map(bulkMap), res=validateBulk(mapped);
+        showBulk(res,raw.length);
+        if(status) status.textContent=raw.length+' rows read successfully.';
+      }).catch(function(err){
+        if(status) status.textContent='Excel read nahi ho saki.';
+        alert('Excel file read nahi ho saki. CSV format use karke try karein.\n\n'+(err.message||err));
+      });
+      input.value='';
+      return;
+    }
+
+    if(ext==='csv'){
+      f.text().then(function(text){
+        const raw=parseCSV(text);
+        if(!raw.length) throw new Error('File me data rows nahi mili');
+        const mapped=raw.map(bulkMap), res=validateBulk(mapped);
+        showBulk(res,raw.length);
+        if(status) status.textContent=raw.length+' rows read successfully.';
+      }).catch(function(err){
+        if(status) status.textContent='CSV read nahi ho saki.';
+        alert('CSV file read nahi ho saki.\n\n'+(err.message||err));
+      });
+    }else{
+      if(status) status.textContent='CSV choose karein. Excel (.xlsx) ke liye internet/XLSX library zaroori hai.';
+      alert('Filhaal CSV file choose karein. CSV ko Microsoft Excel me khola aur save kiya ja sakta hai.');
+    }
+    input.value='';
+  }
+
+  function bind(){
+    const btn=document.getElementById('downloadStudentTemplate');
+    const input=document.getElementById('studentBulkFile');
+    if(btn){
+      btn.onclick=function(e){
+        e.preventDefault();
+        try{
+          if(window.XLSX){
+            const rows=[{'Admission No':'1001','Student Name':'Example Student','Class':'6','Gender':'Male','DOB':'12/05/2014','Father Name':'Father Name','Mother Name':'Mother Name','Mobile':'9876543210','Samagra ID':'','Aadhaar':'','Address':'Village / City'}];
+            const wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb,ws,'Students');
+            XLSX.writeFile(wb,'Nikhat_Middle_School_Student_Template.xlsx');
+          }else{
+            downloadCSV();
+          }
+        }catch(err){ downloadCSV(); }
+      };
+    }
+    if(input) input.onchange=function(){ handleFile(input); };
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind);
+  else bind();
+})();
+</script>
 </body></html>
