@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<title>Nikhat Middle School Digora - School Management v101</title>
+<title>Nikhat Middle School Digora - School Management v104</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f6fb;color:#182033}
 button,input,select{font:inherit}button{cursor:pointer;border:0}
@@ -1570,7 +1570,7 @@ updateBackupStatus();
 
 
 /* ===== Bulk Student Upload ===== */
-let bulkRows=[];
+var bulkRows=[];
 function bh(v){return String(v??'').trim().toLowerCase().replace(/[\s_\-\/]+/g,'');}
 function bulkMap(row){const ks=Object.keys(row);const g=a=>{const A=a.map(bh),k=ks.find(x=>A.includes(bh(x)));return k?String(row[k]??'').trim():''};return {admissionNo:g(['Admission No','Admission Number','Adm No']),name:g(['Student Name','Name']),className:g(['Class','Class Name','Standard']).toUpperCase(),gender:g(['Gender','Sex']),dob:g(['DOB','Date of Birth']),father:g(['Father Name','Father',"Father's Name"]),mother:g(['Mother Name','Mother',"Mother's Name"]),mobile:g(['Mobile','Mobile No','Phone','Contact']),samagra:g(['Samagra ID','Samagra']),aadhaar:g(['Aadhaar','Aadhar','Aadhaar No']),address:g(['Address','Student Address'])};}
 function bulkValidClass(c){return ['LKG','UKG','1','2','3','4','5','6','7','8','9','10'].includes(c);}
@@ -2005,15 +2005,7 @@ document.getElementById('reportClassCenter')?.addEventListener('change',v69Gener
   window.v76Edit=function(id){var e=$('v76Student');if(!e)return;e.value=String(id);fill()}
   window.v76WA=function(phone,name){var t=prompt('WhatsApp message:',msg(name));if(t!==null)window.open('https://wa.me/'+String(phone).replace(/\D/g,'')+'?text='+encodeURIComponent(t),'_blank')}
   window.v76SMS=function(phone,name){var t=prompt('SMS message:',msg(name));if(t!==null)window.location.href='sms:'+String(phone).replace(/\D/g,'')+'?body='+encodeURIComponent(t)}
-  function printList(){var rs=filtered(),w=window.open('','_blank');if(!w){alert('Please allow popups.');return}var b='<h2>Nikhat Middle School Digora - Parent Contact List</h2><table><tr><th>Student</th><th>Class</th><th>Father</th><th>Father Mobile</th><th>Mother Mobile</th><th>Guardian Mobile</th><th>Emergency</th><th>Address</th></tr>';rs.forEach(function(r){b+='<tr><td>'+esc(r.name)+'</td><td>'+esc(r.cls)+'</td><td>'+esc(r.father)+'</td><td>'+esc(r.fatherMobile||r.baseMobile)+'</td><td>'+esc(r.motherMobile)+'</td><td>'+esc(r.guardianMobile)+'</td><td>'+esc(r.emergency)+'</td><td>'+esc(r.address)+'</td></tr>'});b+='</table>';w.document.write('<!doctype html><html><head><title>Parent Contact List</title><style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #bbb;padding:6px;text-align:left}th{background:#eee}@page{size:A4 landscape;margin:10mm}</style><style>.v87-bulk{margin:0 0 18px;border:1px solid #d8e2f2;border-radius:14px;background:#f8fbff}.v87-bulk .bulk-head{display:flex;justify-content:space-between;gap:14px;align-items:center}.v87-bulk h3{margin:0 0 5px}.v87-bulk .bulk-status{margin-top:10px}.v87-bulk .bulk-preview{margin-top:12px}.v87-bulk .bulk-actions{display:flex;gap:8px;flex-wrap:wrap}</style>
-<style id="v88FeeStructureStyle">
-.v88-structure{margin-top:18px;border:1px solid #d9dee8;border-radius:12px;padding:14px;background:#fbfcff}.v88-structure .bulk-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.v88-structure .bulk-actions{display:flex;flex-wrap:wrap;gap:8px}.v88-structure table input{min-width:90px;width:100%;box-sizing:border-box}.v88-structure .v88-note{font-size:12px;color:#667085;margin-top:8px}.v88-structure .v88-total{font-weight:800}.v88-structure .v88-status{margin:10px 0;padding:9px 11px;border-radius:9px;background:#f2f4f7;font-size:12px}.v88-structure .v88-status.ok{background:#ecfdf3;color:#067647}.v88-structure .v88-status.err{background:#fef3f2;color:#b42318}@media(max-width:700px){.v88-structure .bulk-head{flex-direction:column}.v88-structure .bulk-actions{width:100%}}
-</style>
-
-<style id="v89-fee-dashboard-css">
-.v89-fee-dashboard{margin-top:18px;border:1px solid #dbe2ea;border-radius:14px;padding:16px;background:#fbfcfe}.v89-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.v89-head h3{margin:0}.v89-actions{display:flex;gap:8px;flex-wrap:wrap}.v89-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}.v89-stat{border:1px solid #e4e8ef;border-radius:10px;padding:11px;background:#fff}.v89-stat small{display:block;color:#667085}.v89-stat strong{display:block;font-size:20px;margin-top:4px}.v89-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.v89-box{border:1px solid #e4e8ef;border-radius:10px;padding:12px;background:#fff}.v89-box h4{margin:0 0 9px}.v89-table{width:100%;border-collapse:collapse;font-size:12px}.v89-table th,.v89-table td{border:1px solid #e5e7eb;padding:7px;text-align:left}.v89-table th{background:#f3f5f8}.v89-danger{color:#b42318;font-weight:700}.v89-good{color:#067647;font-weight:700}.v89-muted{color:#667085;font-size:12px;margin-top:8px}@media(max-width:800px){.v89-stats{grid-template-columns:1fr 1fr}.v89-grid{grid-template-columns:1fr}}
-</style>
-</head><body>'+b+'</body></html>');w.document.close();setTimeout(function(){w.print()},400)}
+  function printList(){var rs=filtered(),w=window.open('','_blank');if(!w){alert('Please allow popups.');return}var b='<!doctype html><html><head><title>Parent Contact List</title><style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #bbb;padding:6px;text-align:left}th{background:#eee}@page{size:A4 landscape;margin:10mm}</style></head><body><h2>Nikhat Middle School Digora - Parent Contact List</h2><table><tr><th>Student</th><th>Class</th><th>Father</th><th>Father Mobile</th><th>Mother Mobile</th><th>Guardian Mobile</th><th>Emergency</th><th>Address</th></tr>';rs.forEach(function(r){b+='<tr><td>'+esc(r.name)+'</td><td>'+esc(r.cls)+'</td><td>'+esc(r.father)+'</td><td>'+esc(r.fatherMobile||r.baseMobile)+'</td><td>'+esc(r.motherMobile)+'</td><td>'+esc(r.guardianMobile)+'</td><td>'+esc(r.emergency)+'</td><td>'+esc(r.address)+'</td></tr>'});b+='</table></body></html>';w.document.write(b);w.document.close();setTimeout(function(){w.print()},400)}
   function exportCSV(){var rs=filtered(),head=['Student','Class','Student ID','Father','Father Mobile','Mother','Mother Mobile','Guardian Mobile','Emergency','Address'],lines=[head].concat(rs.map(function(r){return[r.name,r.cls,r.studentId,r.father,r.fatherMobile||r.baseMobile,r.mother,r.motherMobile,r.guardianMobile,r.emergency,r.address]})),csv=lines.map(function(row){return row.map(function(x){return'"'+String(x==null?'':x).replace(/"/g,'""')+'"'}).join(',')}).join('\n'),blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Nikhat_Parent_Contacts_V76.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)}
   function init(){if(!$('v76Student'))return;$('v76Save').onclick=saveContact;$('v76Clear').onclick=clearForm;$('v76Refresh').onclick=render;$('v76Print').onclick=printList;$('v76Export').onclick=exportCSV;$('v76Student').onchange=fill;$('v76Class').onchange=render;$('v76Search').oninput=render;render()}
   window.v76Refresh=render;if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init()
@@ -3294,7 +3286,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 </script>
 
 <script>
-/* V103: self-contained XLSX reader. No CDN/library is needed for .xlsx upload. */
+/* V104: self-contained XLSX reader + bulkRows + parent-contact print fix. No CDN/library is needed for .xlsx upload. */
 (function(){
   function parseCSV(text){
     text=String(text||'').replace(/^\ufeff/,'');
