@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<title>Nikhat Middle School Digora - School Management v77</title>
+<title>Nikhat Middle School Digora - School Management v101</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f6fb;color:#182033}
 button,input,select{font:inherit}button{cursor:pointer;border:0}
@@ -727,14 +727,31 @@ button,input,select{font:inherit}button{cursor:pointer;border:0}
 </div>
 <script>
 function loadXLSX(callback){
-  if(window.XLSX){ callback(true); return; }
-  if(window.__xlsxLoading){ window.__xlsxQueue.push(callback); return; }
-  window.__xlsxLoading=true; window.__xlsxQueue=[callback];
-  const s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-  s.onload=()=>{const q=window.__xlsxQueue||[];window.__xlsxLoading=false;window.__xlsxQueue=[];q.forEach(fn=>fn(true));};
-  s.onerror=()=>{const q=window.__xlsxQueue||[];window.__xlsxLoading=false;window.__xlsxQueue=[];q.forEach(fn=>fn(false));};
-  document.head.appendChild(s);
+  if(window.XLSX){ if(typeof callback==='function') callback(true); return Promise.resolve(true); }
+  if(window.__xlsxPromise){
+    return window.__xlsxPromise.then(ok=>{if(typeof callback==='function')callback(ok);return ok;});
+  }
+  const urls=[
+    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+    'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js',
+    'https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js'
+  ];
+  window.__xlsxPromise=(async()=>{
+    for(const url of urls){
+      try{
+        const ok=await new Promise(resolve=>{
+          const s=document.createElement('script');
+          s.src=url; s.async=true;
+          s.onload=()=>resolve(!!window.XLSX);
+          s.onerror=()=>resolve(false);
+          document.head.appendChild(s);
+        });
+        if(ok)return true;
+      }catch(e){}
+    }
+    return false;
+  })();
+  return window.__xlsxPromise.then(ok=>{if(typeof callback==='function')callback(ok);return ok;});
 }
 </script>
 <script>
@@ -1600,7 +1617,7 @@ document.addEventListener('click',e=>{
 
 async function parseBulk(file){const ext=file.name.toLowerCase().split('.').pop();if(ext==='csv'){return csvFallback(await file.text())}if(ext==='xlsx'||ext==='xls'){if(window.XLSX){const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'});return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}const ok=await new Promise(resolve=>loadXLSX(resolve));if(!ok||!window.XLSX)throw new Error('Excel library load failed');const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'});return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}throw new Error('Unsupported file format')}
 function csvFallback(t){const lines=t.replace(/\r/g,'').split('\n').filter(x=>x.trim());if(!lines.length)return [];const split=s=>s.split(',').map(x=>x.trim().replace(/^"|"$/g,''));const heads=split(lines[0]);return lines.slice(1).map(line=>{const v=split(line),o={};heads.forEach((h,i)=>o[h]=v[i]??'');return o});}
-document.getElementById('downloadStudentTemplate')?.addEventListener('click',()=>{const rows=[{'Admission No':'1001','Student Name':'Example Student','Class':'6','Gender':'Male','DOB':'12/05/2014','Father Name':'Father Name','Mother Name':'Mother Name','Mobile':'9876543210','Samagra ID':'','Aadhaar':'','Address':'Village / City'}];if(window.XLSX){const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Students');XLSX.writeFile(wb,'Nikhat_Middle_School_Student_Template.xlsx');}else{const csv=Object.keys(rows[0]).join(',')+'\n'+Object.values(rows[0]).map(x=>'"'+x+'"').join(',');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='Nikhat_Middle_School_Student_Template.csv';a.click();}});
+document.getElementById('downloadStudentTemplate')?.addEventListener('click',async()=>{const rows=[{'Admission No':'1001','Student Name':'Example Student','Class':'6','Gender':'Male','DOB':'12/05/2014','Father Name':'Father Name','Mother Name':'Mother Name','Mobile':'9876543210','Samagra ID':'','Aadhaar':'','Address':'Village / City'}];const headers=Object.keys(rows[0]);const vals=Object.values(rows[0]);const makeCSV=()=>{const csv='\ufeff'+headers.map(x=>'"'+x.replace(/"/g,'""')+'"').join(',')+'\r\n'+vals.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='Nikhat_Middle_School_Student_Template.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);};try{const ok=window.XLSX?true:await loadXLSX();if(ok&&window.XLSX){const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows,{header:headers});XLSX.utils.book_append_sheet(wb,ws,'Students');XLSX.writeFile(wb,'Nikhat_Middle_School_Student_Template.xlsx');}else{makeCSV();alert('Excel library load नहीं हुई, इसलिए CSV template डाउनलोड किया गया है। CSV को Excel में भी खोला जा सकता है।');}}catch(err){console.error(err);makeCSV();}});
 document.getElementById('studentBulkFile')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;const st=document.getElementById('bulkUploadStatus');st.textContent='File read ho rahi hai...';try{const raw=await parseBulk(f);if(!raw.length){throw new Error('File me data rows nahi mili')}const mapped=raw.map(bulkMap),res=validateBulk(mapped);showBulk(res,raw.length);st.textContent=`${raw.length} rows read successfully.`}catch(err){console.error('Bulk upload:',err);st.textContent='File read nahi ho saki. Excel (.xlsx/.xls) ya CSV file check karein.';alert('Excel/CSV file read nahi ho saki. Agar Excel file hai to internet on karke dobara try karein; CSV offline bhi chalegi.\n\nError: '+(err?.message||err));}e.target.value=''});
 document.getElementById('bulkCancel')?.addEventListener('click',()=>{bulkRows=[];document.getElementById('bulkPreviewWrap').style.display='none';document.getElementById('studentBulkFile').value='';});
 document.getElementById('bulkImport')?.addEventListener('click',()=>{if(!bulkRows.length){alert('Import karne ke liye valid students nahi hain.');return;}bulkRows.forEach(r=>students.push({id:uid(),adm:r.admissionNo,name:r.name,cls:r.className,gender:r.gender,dob:r.dob,father:r.father,mother:r.mother,mobile:r.mobile,samagra:r.samagra,aadhaar:r.aadhaar,address:r.address,photo:''}));save();renderStudents();renderClasses();updateDash();document.getElementById('bulkUploadStatus').textContent=`${bulkRows.length} students successfully imported.`;document.getElementById('bulkPreviewWrap').style.display='none';document.getElementById('studentBulkFile').value='';bulkRows=[];alert('Bulk student import complete.');});
