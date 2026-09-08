@@ -369,7 +369,7 @@ button,input,select{font:inherit}button{cursor:pointer;border:0}
 <div class="v78-grid">
 <div class="v78-card" style="grid-column:1/-1"><b>1. Supabase Connection</b><p class="muted">Supabase Project URL और <b>anon / publishable key</b> डालें. <b>Service Role key कभी न डालें.</b></p><label>Project URL<input id="v80Url" style="width:100%;padding:10px;border:1px solid #d8dce5;border-radius:8px" placeholder="https://xxxxxxxx.supabase.co"></label><label style="display:block;margin-top:8px">Anon / Publishable Key<input id="v80Key" type="password" style="width:100%;padding:10px;border:1px solid #d8dce5;border-radius:8px" placeholder="eyJ..."></label><div style="margin-top:8px"><button class="primary" id="v80Connect" type="button">🔗 Connect & Test</button></div></div>
 <div class="v78-card"><b>2. Cloud Login</b><p class="muted">Cloud database access के लिए Supabase Auth email/password इस्तेमाल होगा.</p><label>Email<input id="v80Email" type="email" autocomplete="username" placeholder="school@example.com"></label><label style="display:block;margin-top:8px">Password<input id="v80Password" type="password" autocomplete="current-password" placeholder="Password"></label><div style="margin-top:8px"><button class="primary" id="v80Login" type="button">🔐 Cloud Login</button> <button class="secondary" id="v80Logout" type="button">🚪 Logout</button></div><div id="v80AuthInfo" class="muted" style="margin-top:8px;font-size:12px"></div></div>
-<div class="v78-card"><b>3. Data Sync</b><p class="muted">V81 में Cloud Login के बाद data <b>automatic sync</b> होगा. Internet न होने पर local data चलता रहेगा और connection वापस आने पर sync फिर कोशिश करेगा.</p><button class="secondary" id="v80Download" type="button">⬇️ Download Cloud Data (Manual)</button> <button class="secondary" id="v80Upload" type="button">⬆️ Upload This Device (Manual)</button><div id="v81AutoSyncInfo" class="muted" style="margin-top:8px;font-weight:700">🔄 Auto Sync: checking...</div></div>
+<div class="v78-card"><b>3. Data Sync</b><p class="muted">V81 में Cloud Login के बाद data <b>automatic sync</b> होगा. Internet न होने पर local data चलता रहेगा और connection वापस आने पर sync फिर कोशिश करेगा.</p><button class="secondary" id="v80Download" type="button">⬇️ Download Cloud Data (Manual)</button> <button class="secondary" id="v80Upload" type="button">⬆️ Upload This Device (Manual)</button> <button class="secondary" id="v122InitializeCloud" type="button">🛡️ Initialize Cloud from This Device</button><div id="v81AutoSyncInfo" class="muted" style="margin-top:8px;font-weight:700">🔄 Auto Sync: checking...</div></div>
 <div class="v78-card"><b>4. Status</b><p class="muted">Cloud connection और login की स्थिति.</p><div id="v80Info" style="font-size:12px;line-height:1.6"><b>App Login:</b> Active on this device.<br><b>Cloud Database:</b> Not configured yet.<br><b>Mode:</b> Local / Offline</div></div>
 <div class="v78-card" style="grid-column:1/-1">
 <b>5. Cloud Safety & Recovery / क्लाउड सुरक्षा एवं रिकवरी</b>
@@ -767,7 +767,26 @@ function uid(){return 'stu_'+Date.now().toString(36)+'_'+Math.random().toString(
 window.nmsGetStudentsV122=function(){return Array.isArray(students)?students:[]} 
 function normalizeStudents(){students=students.map((s,i)=>({...s,id:s.id||uid(),mother:s.mother||'',father:s.father||s.parent||'',dob:s.dob||'',gender:s.gender||'',samagra:s.samagra||'',aadhaar:s.aadhaar||'',address:s.address||'',photo:s.photo||'',mobile:s.mobile||'',adm:s.adm||('NMS'+String(i+1).padStart(3,'0')),name:s.name||'',cls:s.cls||'1'}));
  const seen=new Set(); students=students.filter(s=>{const k=String(s.adm).toLowerCase()+'|'+String(s.name).trim().toLowerCase()+'|'+String(s.mobile);if(seen.has(k))return false;seen.add(k);return true}); save();}
-function save(){if(Array.isArray(students)&&students.length){try{localStorage.setItem('nms_students_backup',JSON.stringify(students))}catch(e){}} localStorage.setItem('nms_students',JSON.stringify(students));localStorage.setItem('nms_teachers',JSON.stringify(teachers));localStorage.setItem('nms_fees',JSON.stringify(fees));localStorage.setItem('nms_attendance',JSON.stringify(attendance));localStorage.setItem('nms_marks',JSON.stringify(marks));try{localStorage.setItem('nms_full_autobackup',JSON.stringify({app:'Nikhat Middle School Digora',backupVersion:1,savedAt:new Date().toISOString(),students,teachers,fees,attendance,marks}))}catch(e){console.warn('Auto backup unavailable',e)}}
+function freeLocalStorageForSync(){
+  // Keep the live data keys; remove only redundant local copies that can consume
+  // the browser's small localStorage quota. Safety backups are downloadable via
+  // the Backup & Restore module and are no longer duplicated on every save.
+  try{
+    const core=localStorage.getItem('nms_students');
+    if(core!==null){
+      localStorage.removeItem('nms_students_backup');
+      localStorage.removeItem('nms_full_autobackup');
+    }
+  }catch(e){console.warn('Storage cleanup unavailable',e)}
+}
+function save(){
+  freeLocalStorageForSync();
+  localStorage.setItem('nms_students',JSON.stringify(students));
+  localStorage.setItem('nms_teachers',JSON.stringify(teachers));
+  localStorage.setItem('nms_fees',JSON.stringify(fees));
+  localStorage.setItem('nms_attendance',JSON.stringify(attendance));
+  localStorage.setItem('nms_marks',JSON.stringify(marks));
+}
 function restoreStudentsBackup(){try{const b=JSON.parse(localStorage.getItem('nms_students_backup')||'[]');if(Array.isArray(b)&&b.length){students=b;normalizeStudents();renderStudents();renderClasses();updateDash();return true}}catch(e){}return false}
 
 if(!Array.isArray(students))students=[];
@@ -2105,6 +2124,7 @@ if(!current())setTimeout(showLogin,0);
 /* V82 Supabase Cloud Database + Conflict-Safe Multi-device Auto Sync */
 (function(){
 const CFG='nms_v80_cloud_config', KEY_PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base';
+freeLocalStorageForSync();
 let client=null, syncBusy=false, autoTimer=null;
 
 function cfg(){try{return Object.assign({url:'',key:''},JSON.parse(localStorage.getItem(CFG)||'{}'))}catch(e){return {url:'',key:''}}}
@@ -2172,8 +2192,14 @@ function clone(v){try{return JSON.parse(JSON.stringify(v))}catch(e){return v}}
 function same(a,b){try{return JSON.stringify(a)===JSON.stringify(b)}catch(e){return a===b}}
 function getMeta(){try{return JSON.parse(localStorage.getItem(META)||'{}')}catch(e){return {}}}
 function getBase(){try{return JSON.parse(localStorage.getItem(BASE)||'{}')}catch(e){return {}}}
-function putMeta(m){localStorage.setItem(META,JSON.stringify(m))}
-function putBase(b){localStorage.setItem(BASE,JSON.stringify(b))}
+function putMeta(m){
+  try{localStorage.setItem(META,JSON.stringify(m))}
+  catch(e){console.warn('Sync meta storage unavailable',e);freeLocalStorageForSync();try{localStorage.setItem(META,JSON.stringify(m))}catch(e2){console.warn('Sync meta still unavailable',e2)}}
+}
+function putBase(b){
+  try{localStorage.setItem(BASE,JSON.stringify(b))}
+  catch(e){console.warn('Sync base storage unavailable',e);freeLocalStorageForSync();try{localStorage.setItem(BASE,JSON.stringify(b))}catch(e2){console.warn('Sync base still unavailable',e2)}}
+}
 function autoSyncInfo(msg){const el=document.getElementById('v81AutoSyncInfo');if(el)el.textContent='🔄 Auto Sync: '+msg}
 
 function mergeRecords(base,local,cloud){
@@ -2240,7 +2266,7 @@ async function pullCloudSilently(reason){
     const {data:sessionData,error:sessionError}=await client.auth.getSession();if(sessionError)throw sessionError;
     if(!sessionData.session){autoSyncInfo('login required');return false}
     const {data,error}=await client.from('school_kv').select('key,value,updated_at').order('key');if(error)throw error;
-    if(!data?.length){autoSyncInfo('cloud empty');return false}
+    if(!data?.length){setStatus(true,'Connected + Logged in');autoSyncInfo('cloud empty • initialize required');return false}
     const meta=getMeta(),base=getBase();let changed=0, conflicts=0;
     for(const r of data){
       const cloudTime=new Date(r.updated_at||0).getTime(), known=Number(meta[r.key]||0);
@@ -2269,16 +2295,53 @@ async function pullCloudSilently(reason){
     autoSyncInfo('synced '+data.length+' cloud items'+(conflicts?' • '+conflicts+' conflict saved':'')+' • '+new Date().toLocaleTimeString());
     if(changed&&reason==='startup')setTimeout(()=>location.reload(),250);
     return true
-  }catch(e){console.warn('V82 auto sync:',e);autoSyncInfo('waiting for internet');return false}
+  }catch(e){
+    console.warn('V122 auto sync:',e);
+    const msg=String(e?.message||e||'Unknown sync error').replace(/\s+/g,' ').trim();
+    setStatus(true,'Connected + Logged in • Sync Error');
+    autoSyncInfo('sync error • '+msg.slice(0,140));
+    return false
+  }
   finally{syncBusy=false}
 }
 function localValueExists(k){return localStorage.getItem(k)!==null}
-function scheduleAutoSync(reason){clearTimeout(autoTimer);autoTimer=setTimeout(()=>pullCloudSilently(reason),350)}
+function scheduleAutoSync(reason){
+  clearTimeout(autoTimer);
+  autoTimer=setTimeout(()=>pullCloudSilently(reason),350)
+}
+
 
 async function sessionRequired(){
   if(!client&&!initClient(false))throw new Error('Cloud not configured');
   const {data,error}=await client.auth.getSession();if(error)throw error;
   if(!data.session)throw new Error('पहले Cloud Login करें');return data.session
+}
+async function initializeCloudFromThisDevice(){
+  if(syncBusy)return;
+  syncBusy=true;
+  try{
+    await sessionRequired();
+    const {data,error}=await client.from('school_kv').select('key').limit(1);
+    if(error)throw error;
+    if(data?.length){
+      alert('Cloud में पहले से data मौजूद है. Safety के लिए Initialize Cloud नहीं किया गया.');
+      autoSyncInfo('cloud has data • normal sync');
+      return
+    }
+    const keys=cloudKeys();
+    if(!keys.length){alert('इस device पर school data नहीं मिला.');return}
+    if(!confirm('Cloud अभी खाली है. इस device का पूरा local school data Cloud में सुरक्षित पहली copy के रूप में upload होगा. आगे बढ़ें?'))return;
+    let ok=0,conf=0;
+    for(const k of keys){
+      try{if(await pushKeyConflictSafe(k,readJson(k),true))ok++}catch(e){console.warn(k,e);conf++}
+    }
+    setStatus(true,'Cloud Initialized • '+ok+' items');
+    autoSyncInfo('cloud initialized • '+new Date().toLocaleTimeString());
+    alert('Cloud initialize हो गया. '+ok+' data items की पहली सुरक्षित copy Cloud में बन गई.'+(conf?' '+conf+' item upload नहीं हुआ.':''));
+  }catch(e){
+    alert('Cloud initialization failed: '+(e?.message||e));
+    autoSyncInfo('sync error • '+String(e?.message||e).slice(0,140));
+  }finally{syncBusy=false}
 }
 async function upload(){
   if(syncBusy)return;syncBusy=true;
@@ -2338,6 +2401,7 @@ function init(){
   document.getElementById('v80Logout')?.addEventListener('click',cloudLogout);
   document.getElementById('v80Upload')?.addEventListener('click',upload);
   document.getElementById('v80Download')?.addEventListener('click',download);
+  document.getElementById('v122InitializeCloud')?.addEventListener('click',initializeCloudFromThisDevice);
   initClient(false);installAutoUpload();setTimeout(()=>pullCloudSilently('startup'),900);
   window.addEventListener('online',()=>scheduleAutoSync('online'));
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleAutoSync('visible')})
