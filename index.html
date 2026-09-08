@@ -182,7 +182,10 @@ button,input,select{font:inherit}button{cursor:pointer;border:0}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<link rel="manifest" href="./manifest.webmanifest">
+<link rel="manifest" href="https://nikhatschooldigora-cloud.github.io/nikhat-school-management-v100/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="https://nikhatschooldigora-cloud.github.io/nikhat-school-management-v100/icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="https://nikhatschooldigora-cloud.github.io/nikhat-school-management-v100/icon-192.png">
+<meta name="application-name" content="Nikhat School">
 <meta name="theme-color" content="#0b5cff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2094,7 +2097,7 @@ function renderPortal(){
  if(u.role==='guardian'){ids=(Array.isArray(u.childIds)?u.childIds:[]).map(String);if(!ids.length&&u.guardianStudentId)ids=[String(u.guardianStudentId)];if(!ids.length&&u.guardianId)ids=[String(u.guardianId)]}
  const kids=list.filter(s=>ids.includes(String(s.id)));box.innerHTML=kids.length?kids.map(renderStudentCard).join(''):'<div class="muted">No linked student record found. Admin को Users & Permissions में account linkage check करना चाहिए.</div>';
 }
-document.addEventListener('DOMContentLoaded',()=>{const u=current();if(!u){showLogin();return}hideMenus();document.getElementById('v77SaveUser')?.addEventListener('click',saveUser);document.getElementById('v77ClearUser')?.addEventListener('click',clearUser);document.getElementById('v122GenerateAccounts')?.addEventListener('click',window.v122EnsureAllPortalAccounts);renderUsers();const top=document.querySelector('.top');if((u.role==='student'||u.role==='guardian')&&!document.querySelector('.nav button[data-page="'+(u.role==='student'?'studentPortal':'guardianPortal')+'"]')){const nav=document.querySelector('.nav');if(nav){const pb=document.createElement('button');pb.type='button';pb.dataset.page=u.role==='student'?'studentPortal':'guardianPortal';pb.textContent=u.role==='student'?'🎓 Student Portal':'👨‍👩‍👧 Guardian Portal';pb.onclick=()=>showPage(pb.dataset.page);nav.appendChild(pb)}}renderPortal();if(top&&!document.getElementById('v77UserBadge')){const b=document.createElement('span');b.id='v77UserBadge';b.style='margin-left:auto;font-size:12px;font-weight:700';b.textContent=u.name+' • '+(rn[u.role]||u.role);const lo=document.createElement('button');lo.type='button';lo.className='secondary';lo.textContent='🚪 Logout';lo.onclick=logout;top.appendChild(b);top.appendChild(lo)}});
+document.addEventListener('DOMContentLoaded',()=>{const u=current();if(!u){showLogin();return}hideMenus();document.getElementById('v77SaveUser')?.addEventListener('click',saveUser);document.getElementById('v77ClearUser')?.addEventListener('click',clearUser);document.getElementById('v122GenerateAccounts')?.addEventListener('click',window.v122EnsureAllPortalAccounts);if(u.role==='admin'){try{const list=Array.isArray(window.nmsGetStudentsV122?.())?window.nmsGetStudentsV122():[];list.forEach(st=>ensurePortalAccounts(st,true));persistUsers()}catch(e){console.warn('Portal account migration',e)}}renderUsers();const top=document.querySelector('.top');if((u.role==='student'||u.role==='guardian')&&!document.querySelector('.nav button[data-page="'+(u.role==='student'?'studentPortal':'guardianPortal')+'"]')){const nav=document.querySelector('.nav');if(nav){const pb=document.createElement('button');pb.type='button';pb.dataset.page=u.role==='student'?'studentPortal':'guardianPortal';pb.textContent=u.role==='student'?'🎓 Student Portal':'👨‍👩‍👧 Guardian Portal';pb.onclick=()=>showPage(pb.dataset.page);nav.appendChild(pb)}}renderPortal();if(top&&!document.getElementById('v77UserBadge')){const b=document.createElement('span');b.id='v77UserBadge';b.style='margin-left:auto;font-size:12px;font-weight:700';b.textContent=u.name+' • '+(rn[u.role]||u.role);const lo=document.createElement('button');lo.type='button';lo.className='secondary';lo.textContent='🚪 Logout';lo.onclick=logout;top.appendChild(b);top.appendChild(lo)}});
 if(!current())setTimeout(showLogin,0);
 })();
 </script>
@@ -2494,7 +2497,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   let deferredPrompt=null;
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;const b=document.getElementById('v86InstallApp');if(b)b.style.display='inline-flex';});
   window.addEventListener('appinstalled',()=>{deferredPrompt=null;const b=document.getElementById('v86InstallApp');if(b)b.style.display='none';});
-  document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('v86InstallApp');if(!b)return;b.style.display='none';b.addEventListener('click',async()=>{if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;}else alert('App install option browser/device support par depend karta hai. Chrome/Edge me HTTPS ya localhost par kholne par Install App option mil sakta hai.');});});
+  document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('v86InstallApp');if(!b)return;b.style.display='none';b.addEventListener('click',async()=>{if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;}else alert('Chrome/Edge ne abhi direct install prompt nahi diya. Browser menu me Install app / Add to Home screen option dekhein. Agar option na ho to site ko ek baar refresh karke phir check karein.');});});
 })();
 </script>
 <script>
@@ -3331,16 +3334,38 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function render(result,total){window.__v121BulkRows=result.valid;const wrap=byId('bulkPreviewWrap');if(wrap)wrap.style.display='block';const title=byId('bulkPreviewTitle');if(title)title.textContent='Preview: '+result.valid.length+' valid of '+total+' rows';const er=byId('bulkErrors');if(er)er.textContent=result.errors.length?result.errors.slice(0,30).join('\n')+(result.errors.length>30?'\n...and '+(result.errors.length-30)+' more':''):'No errors found.';const st=byId('bulkUploadStatus');if(st)st.textContent=total+' rows read — '+result.valid.length+' valid, '+result.errors.length+' rejected.';const h=byId('bulkPreviewHead');if(h)h.innerHTML='<tr><th>Admission</th><th>Name</th><th>Class</th><th>Gender</th><th>Father</th><th>Mother</th><th>Mobile</th><th>Samagra ID</th><th>Aadhaar</th><th>Address</th><th>Status</th></tr>';const b=byId('bulkPreviewBody');if(b)b.innerHTML=result.valid.slice(0,100).map(r=>'<tr><td>'+String(r.admissionNo)+'</td><td>'+String(r.name)+'</td><td>'+String(r.className)+'</td><td>'+String(r.gender||'—')+'</td><td>'+String(r.father||'—')+'</td><td>'+String(r.mother||'—')+'</td><td>'+String(r.mobile||'—')+'</td><td>'+String(r.samagra||'—')+'</td><td>'+String(r.aadhaar||'—')+'</td><td>'+String(r.address||'—')+'</td><td>Valid</td></tr>').join('')}
   async function handleFile(file){const st=byId('bulkUploadStatus');if(st)st.textContent='File read ho rahi hai...';try{const ext=file.name.toLowerCase().split('.').pop();const raw=ext==='csv'?parseCsv(await file.text()):await parseXlsx(file);if(!raw.length)throw Error('File me data rows nahi mili');render(validate(raw.map(mapRow)),raw.length)}catch(e){console.error('V121 Excel upload',e);if(st)st.textContent='File read nahi ho saki.';alert('Excel/CSV file read nahi ho saki.\n\n'+(e.message||e))}}
   function cancel(){window.__v121BulkRows=[];if(byId('bulkPreviewWrap'))byId('bulkPreviewWrap').style.display='none';if(byId('studentBulkFile'))byId('studentBulkFile').value='';}
-  function doImport(){const rows=window.__v121BulkRows||[];if(!rows.length){alert('Import karne ke liye valid students nahi hain.');return}if(!Array.isArray(students)){alert('Student data unavailable.');return}rows.forEach(r=>{const ns={id:typeof uid==='function'?uid():('stu_'+Date.now()+'_'+Math.random().toString(36).slice(2)),adm:r.admissionNo,name:r.name,cls:r.className,gender:r.gender,dob:r.dob,father:r.father,mother:r.mother,mobile:r.mobile,samagra:r.samagra,aadhaar:r.aadhaar,address:r.address,photo:''};students.push(ns);try{if(typeof window.v77CreatePortalAccounts==='function')window.v77CreatePortalAccounts(ns)}catch(e){console.warn('Portal account generation failed',e)}});if(typeof save==='function')save();if(typeof renderStudents==='function')renderStudents();if(typeof renderClasses==='function')renderClasses();if(typeof updateDash==='function')updateDash();const st=byId('bulkUploadStatus');if(st)st.textContent=rows.length+' students successfully imported.';if(byId('bulkPreviewWrap'))byId('bulkPreviewWrap').style.display='none';if(byId('studentBulkFile'))byId('studentBulkFile').value='';window.__v121BulkRows=[];alert('Bulk student import complete.')}
+  function doImport(){const rows=window.__v121BulkRows||[];if(!rows.length){alert('Import karne ke liye valid students nahi hain.');return}if(!Array.isArray(students)){alert('Student data unavailable.');return}rows.forEach(r=>{const ns={id:typeof uid==='function'?uid():('stu_'+Date.now()+'_'+Math.random().toString(36).slice(2)),adm:r.admissionNo,name:r.name,cls:r.className,gender:r.gender,dob:r.dob,father:r.father,mother:r.mother,mobile:r.mobile,samagra:r.samagra,aadhaar:r.aadhaar,address:r.address,photo:''};students.push(ns)});let portalSetsCreated=0;try{if(typeof window.v77CreatePortalAccounts==='function'){const beforeUsers=JSON.parse(localStorage.getItem('nms_users_v77')||'[]').length;students.forEach(st=>window.v77CreatePortalAccounts(st,true));const afterUsers=JSON.parse(localStorage.getItem('nms_users_v77')||'[]').length;portalSetsCreated=Math.max(0,Math.floor((afterUsers-beforeUsers)/2));}}catch(e){console.warn('Portal account generation failed',e)}if(typeof save==='function')save();if(typeof renderStudents==='function')renderStudents();if(typeof renderClasses==='function')renderClasses();if(typeof updateDash==='function')updateDash();if(typeof window.v77RenderUsers==='function')window.v77RenderUsers();const st=byId('bulkUploadStatus');if(st)st.textContent=rows.length+' students successfully imported. Student/Guardian portal accounts checked automatically.';if(byId('bulkPreviewWrap'))byId('bulkPreviewWrap').style.display='none';if(byId('studentBulkFile'))byId('studentBulkFile').value='';window.__v121BulkRows=[];alert('Bulk student import complete.')}
   function downloadTemplate(){downloadBlob(new Blob([makeXlsx()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Nikhat_Middle_School_Student_Template.xlsx')}
   document.addEventListener('click',function(e){const d=e.target.closest&&e.target.closest('#downloadStudentTemplate,#bulkCancel,#bulkImport');if(!d)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(d.id==='downloadStudentTemplate')downloadTemplate();else if(d.id==='bulkCancel')cancel();else doImport()},true);
   document.addEventListener('change',function(e){if(!e.target||e.target.id!=='studentBulkFile')return;e.stopPropagation();e.stopImmediatePropagation();const f=e.target.files&&e.target.files[0];if(f)handleFile(f)},true);
 })();
 </script>
+
+<script id="v122-pwa-install">
+(function(){
+  let deferredPrompt=null;
+  function addInstallButton(){
+    if(document.getElementById('v122InstallAppBtn')) return;
+    const b=document.createElement('button');
+    b.id='v122InstallAppBtn'; b.type='button'; b.className='primary';
+    b.textContent='📱 Install Nikhat School App';
+    b.style.cssText='position:fixed;right:14px;bottom:14px;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,.18)';
+    b.onclick=async function(){
+      if(!deferredPrompt){ alert('Chrome अभी install prompt उपलब्ध नहीं कर रहा। Chrome menu में Install / Add to Home screen देखें.'); return; }
+      deferredPrompt.prompt();
+      try{const r=await deferredPrompt.userChoice;if(r&&r.outcome==='accepted')b.remove()}catch(e){}
+      deferredPrompt=null;
+    };
+    document.body.appendChild(b);
+  }
+  window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredPrompt=e;addInstallButton()});
+  window.addEventListener('appinstalled',function(){const b=document.getElementById('v122InstallAppBtn');if(b)b.remove();deferredPrompt=null});
+})();
+</script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js', {scope: './'}).catch(function () {});
+    navigator.serviceWorker.register('./sw.js', {scope: './'}).then(function(reg){try{reg.update()}catch(e){}}).catch(function () {});
   });
 }
 </script>
