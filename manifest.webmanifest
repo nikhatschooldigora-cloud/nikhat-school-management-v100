@@ -2,6 +2,7 @@
   "name": "Nikhat Middle School Digora - School Management",
   "short_name": "Nikhat School",
   "description": "Nikhat Middle School Digora School Management Software",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
