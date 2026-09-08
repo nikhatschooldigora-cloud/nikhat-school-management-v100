@@ -4,6 +4,8 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
+<link rel="icon" href="icon-192.png" type="image/png">
+<meta name="theme-color" content="#0b5cff">
 <title>Nikhat Middle School Digora - School Management v77</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f6fb;color:#182033}
@@ -179,7 +181,7 @@ button,input,select{font:inherit}button{cursor:pointer;border:0}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<link rel="manifest" href="data:application/manifest+json,{"name":"Nikhat Middle School Digora","short_name":"Nikhat School","start_url":".","display":"standalone","background_color":"#ffffff","theme_color":"#0b5cff","icons":[]}">
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b5cff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3296,6 +3298,15 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function downloadTemplate(){downloadBlob(new Blob([makeXlsx()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Nikhat_Middle_School_Student_Template.xlsx')}
   document.addEventListener('click',function(e){const d=e.target.closest&&e.target.closest('#downloadStudentTemplate,#bulkCancel,#bulkImport');if(!d)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(d.id==='downloadStudentTemplate')downloadTemplate();else if(d.id==='bulkCancel')cancel();else doImport()},true);
   document.addEventListener('change',function(e){if(!e.target||e.target.id!=='studentBulkFile')return;e.stopPropagation();e.stopImmediatePropagation();const f=e.target.files&&e.target.files[0];if(f)handleFile(f)},true);
+})();
+</script>
+<script>
+(function(){
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('./sw.js').catch(function(err){ console.warn('PWA service worker registration failed:', err); });
+    });
+  }
 })();
 </script>
 </body></html>
