@@ -369,7 +369,7 @@ button,input,select{font:inherit}button{cursor:pointer;border:0}
 <div class="v78-grid">
 <div class="v78-card" style="grid-column:1/-1"><b>1. Supabase Connection</b><p class="muted">Supabase Project URL और <b>anon / publishable key</b> डालें. <b>Service Role key कभी न डालें.</b></p><label>Project URL<input id="v80Url" style="width:100%;padding:10px;border:1px solid #d8dce5;border-radius:8px" placeholder="https://xxxxxxxx.supabase.co"></label><label style="display:block;margin-top:8px">Anon / Publishable Key<input id="v80Key" type="password" style="width:100%;padding:10px;border:1px solid #d8dce5;border-radius:8px" placeholder="eyJ..."></label><div style="margin-top:8px"><button class="primary" id="v80Connect" type="button">🔗 Connect & Test</button></div></div>
 <div class="v78-card"><b>2. Cloud Login</b><p class="muted">Cloud database access के लिए Supabase Auth email/password इस्तेमाल होगा.</p><label>Email<input id="v80Email" type="email" autocomplete="username" placeholder="school@example.com"></label><label style="display:block;margin-top:8px">Password<input id="v80Password" type="password" autocomplete="current-password" placeholder="Password"></label><div style="margin-top:8px"><button class="primary" id="v80Login" type="button">🔐 Cloud Login</button> <button class="secondary" id="v80Logout" type="button">🚪 Logout</button></div><div id="v80AuthInfo" class="muted" style="margin-top:8px;font-size:12px"></div></div>
-<div class="v78-card"><b>3. Data Sync</b><p class="muted">V81 में Cloud Login के बाद data <b>automatic sync</b> होगा. Internet न होने पर local data चलता रहेगा और connection वापस आने पर sync फिर कोशिश करेगा.</p><button class="secondary" id="v80Download" type="button">⬇️ Download Cloud Data (Manual)</button> <button class="secondary" id="v80Upload" type="button">⬆️ Upload This Device (Manual)</button><div id="v81AutoSyncInfo" class="muted" style="margin-top:8px;font-weight:700">🔄 Auto Sync: checking...</div></div>
+<div class="v78-card"><b>3. Data Sync</b><p class="muted">V81 में Cloud Login के बाद data <b>automatic sync</b> होगा. Internet न होने पर local data चलता रहेगा और connection वापस आने पर sync फिर कोशिश करेगा.</p><button class="secondary" id="v80Download" type="button">⬇️ Download Cloud Data (Manual)</button> <button class="secondary" id="v80Upload" type="button">⬆️ Upload This Device (Manual)</button><div id="v81AutoSyncInfo" class="muted" style="margin-top:8px;font-weight:700">🔄 Auto Sync: checking...</div><button class="secondary" id="v82SyncNow" type="button" style="margin-top:8px">🔄 Sync Now</button></div>
 <div class="v78-card"><b>4. Status</b><p class="muted">Cloud connection और login की स्थिति.</p><div id="v80Info" style="font-size:12px;line-height:1.6"><b>App Login:</b> Active on this device.<br><b>Cloud Database:</b> Not configured yet.<br><b>Mode:</b> Local / Offline</div></div>
 <div class="v78-card" style="grid-column:1/-1">
 <b>5. Cloud Safety & Recovery / क्लाउड सुरक्षा एवं रिकवरी</b>
@@ -2269,12 +2269,22 @@ async function pullCloudSilently(reason){
     autoSyncInfo('synced '+data.length+' cloud items'+(conflicts?' • '+conflicts+' conflict saved':'')+' • '+new Date().toLocaleTimeString());
     if(changed&&reason==='startup')setTimeout(()=>location.reload(),250);
     return true
-  }catch(e){console.warn('V82 auto sync:',e);autoSyncInfo('waiting for internet');return false}
-  finally{syncBusy=false}
+  }catch(e){
+    console.warn('V82 auto sync:',e);
+    const msg=String(e?.message||e||'Unknown sync error').replace(/\s+/g,' ').trim();
+    setStatus(true,'Connected + Logged in • Sync Error');
+    autoSyncInfo('sync error • '+msg.slice(0,140));
+    return false
+  }finally{syncBusy=false}
 }
 function localValueExists(k){return localStorage.getItem(k)!==null}
 function scheduleAutoSync(reason){clearTimeout(autoTimer);autoTimer=setTimeout(()=>pullCloudSilently(reason),350)}
 
+async function syncNow(){
+  if(syncBusy)return;
+  autoSyncInfo('syncing...');
+  await pullCloudSilently('manual');
+}
 async function sessionRequired(){
   if(!client&&!initClient(false))throw new Error('Cloud not configured');
   const {data,error}=await client.auth.getSession();if(error)throw error;
@@ -2338,7 +2348,9 @@ function init(){
   document.getElementById('v80Logout')?.addEventListener('click',cloudLogout);
   document.getElementById('v80Upload')?.addEventListener('click',upload);
   document.getElementById('v80Download')?.addEventListener('click',download);
+  document.getElementById('v82SyncNow')?.addEventListener('click',syncNow);
   initClient(false);installAutoUpload();setTimeout(()=>pullCloudSilently('startup'),900);
+  setInterval(()=>{if(!document.hidden)pullCloudSilently('timer')},30000);
   window.addEventListener('online',()=>scheduleAutoSync('online'));
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleAutoSync('visible')})
 }
