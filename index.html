@@ -2330,7 +2330,7 @@ async function pullCloudSilently(reason){
     putMeta(meta);putBase(base);
     setStatus(true,'Connected + Logged in');
     autoSyncInfo('synced '+data.length+' cloud items'+(conflicts?' • '+conflicts+' conflict saved':'')+' • '+new Date().toLocaleTimeString());
-    if(changed&&reason==='startup')setTimeout(()=>location.reload(),250);
+    if(changed&&reason==='startup'){ setStatus(true,'Connected + Logged in • Sync updated'); }
     return true
   }catch(e){
     console.warn('V122 auto sync:',e);
