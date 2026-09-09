@@ -715,7 +715,7 @@ if(document.readyState!=='loading'){} else {}
 </div>
 <div class="formGrid" id="teacherFormBox" style="display:none">
 <div class="photoBox full"><img alt="Teacher photo" class="photoPreview" id="teacherPhotoPreview"/><div class="photoActions"><label class="photoBtn">📷 Take Photo / फोटो खींचें<input accept="image/*" capture="user" id="tCamera" style="display:none" type="file"/></label><label class="photoBtn">📁 Upload Photo / फोटो चुनें<input accept="image/*" id="tPhoto" style="display:none" type="file"/></label></div><button class="secondary small" id="removeTeacherPhoto" type="button">Remove Photo / फोटो हटाएँ</button></div>
-<input id="tEmpId" placeholder="Employee ID / कर्मचारी आईडी"/>
+<input id="tEmpId" placeholder="Employee ID / कर्मचारी आईडी (School-issued, required)" required/>
 <input id="tName" placeholder="Name / नाम" required=""/>
 <select id="tGender"><option value="">Gender / लिंग</option><option>Male / पुरुष</option><option>Female / महिला</option><option>Other / अन्य</option></select>
 <input id="tDob" title="Date of Birth / जन्म तिथि" type="date"/>
@@ -1469,7 +1469,7 @@ function deleteStudent(id){
    setTimeout(()=>window.v123SyncNow?.(),0);
  }
 }
-function addTeacher(){if(savingTeacher)return;const name=document.getElementById('tName').value.trim();if(!name)return alert('कृपया शिक्षक का नाम भरें');const mobile=document.getElementById('tMobile').value.trim(),aadhaar=document.getElementById('tAadhaar').value.trim();if(mobile&&!/^\d{10}$/.test(mobile))return alert('Mobile number 10 digits का होना चाहिए');if(aadhaar&&!/^\d{12}$/.test(aadhaar))return alert('Aadhaar Number 12 digits का होना चाहिए');savingTeacher=true;document.getElementById('saveTeacherBtn').disabled=true;const empInput=document.getElementById('tEmpId').value.trim(),emp=empInput||'EMP'+String(teachers.length+1).padStart(3,'0');if(!editingTeacherId&&teachers.some(t=>String(t.empId).toLowerCase()===emp.toLowerCase())){savingTeacher=false;document.getElementById('saveTeacherBtn').disabled=false;return alert('यह Employee ID पहले से मौजूद है')}const data={empId:emp,name,role:document.getElementById('tRole').value.trim()||'Teacher',subject:document.getElementById('tSubject').value.trim(),gender:document.getElementById('tGender').value,dob:document.getElementById('tDob').value,joining:document.getElementById('tJoining').value,qualification:document.getElementById('tQualification').value.trim(),mobile,email:document.getElementById('tEmail').value.trim(),aadhaar,salary:document.getElementById('tSalary').value.trim(),address:document.getElementById('tAddress').value.trim(),photo:teacherPhotoData};if(editingTeacherId){const i=teachers.findIndex(t=>t.id===editingTeacherId);if(i>=0)teachers[i]={...teachers[i],...data}}else teachers.push({...data,id:'tea_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8)});save();closeModal();updateDash();renderTeachers();showPage('teachers');alert(editingTeacherId?'शिक्षक की जानकारी अपडेट हो गई':'शिक्षक सफलतापूर्वक सेव हो गया');savingTeacher=false;document.getElementById('saveTeacherBtn').disabled=false}
+function addTeacher(){if(savingTeacher)return;const name=document.getElementById('tName').value.trim();if(!name)return alert('कृपया शिक्षक का नाम भरें');const emp=document.getElementById('tEmpId').value.trim();if(!emp)return alert('कृपया Employee ID भरें। यह ID स्कूल द्वारा जारी की जाती है और अनिवार्य है।');const mobile=document.getElementById('tMobile').value.trim(),aadhaar=document.getElementById('tAadhaar').value.trim();if(mobile&&!/^\d{10}$/.test(mobile))return alert('Mobile number 10 digits का होना चाहिए');if(aadhaar&&!/^\d{12}$/.test(aadhaar))return alert('Aadhaar Number 12 digits का होना चाहिए');savingTeacher=true;document.getElementById('saveTeacherBtn').disabled=true;const dup=teachers.some(t=>String(t.empId||'').trim().toLowerCase()===emp.toLowerCase()&&String(t.id)!==String(editingTeacherId||''));if(dup){savingTeacher=false;document.getElementById('saveTeacherBtn').disabled=false;return alert('यह Employee ID पहले से मौजूद है। कृपया सही Employee ID भरें।')}const data={empId:emp,name,role:document.getElementById('tRole').value.trim()||'Teacher',subject:document.getElementById('tSubject').value.trim(),gender:document.getElementById('tGender').value,dob:document.getElementById('tDob').value,joining:document.getElementById('tJoining').value,qualification:document.getElementById('tQualification').value.trim(),mobile,email:document.getElementById('tEmail').value.trim(),aadhaar,salary:document.getElementById('tSalary').value.trim(),address:document.getElementById('tAddress').value.trim(),photo:teacherPhotoData};let newTeacher=null;if(editingTeacherId){const i=teachers.findIndex(t=>String(t.id)===String(editingTeacherId));if(i>=0)teachers[i]={...teachers[i],...data}}else {newTeacher={...data,id:'tea_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8)};teachers.push(newTeacher)}save();let teacherCreds=null;if(newTeacher&&String(newTeacher.role||'Teacher').toLowerCase().includes('teacher')&&typeof window.v77CreateTeacherAccount==='function'){try{teacherCreds=window.v77CreateTeacherAccount(newTeacher,true)}catch(e){console.warn('Teacher account generation failed',e)}}closeModal();updateDash();renderTeachers();showPage('teachers');const wasEdit=!!editingTeacherId;setTimeout(()=>{try{window.v123SyncNow?.()}catch(e){}},150);if(teacherCreds&&teacherCreds.username&&teacherCreds.password){alert('शिक्षक सफलतापूर्वक सेव हो गया।\n\nTeacher Login ID: '+teacherCreds.username+'\nPassword: '+teacherCreds.password+'\n\nCredentials Users & Permissions में भी उपलब्ध हैं।')}else if(newTeacher){alert('शिक्षक सफलतापूर्वक सेव हो गया।')}else{alert('शिक्षक की जानकारी अपडेट हो गई')}savingTeacher=false;document.getElementById('saveTeacherBtn').disabled=false}
 function deleteTeacher(id){const t=teachers.find(x=>String(x?.id)===String(id));if(!t)return;if(confirm(`क्या आप ${t.name} को delete करना चाहते हैं? / Delete this teacher?`)){const tid=String(id),now=Date.now();teachers=teachers.filter(x=>String(x?.id)!==tid);try{const d=JSON.parse(localStorage.getItem('nms_sync_deleted')||'{}')||{};d['teacher:'+tid]={type:'teacher',id:tid,empId:t?.empId||'',name:t?.name||'',mobile:t?.mobile||'',email:t?.email||'',deletedAt:now};localStorage.setItem('nms_sync_deleted',JSON.stringify(d))}catch(e){console.warn('teacher delete tombstone failed',e)}save();updateDash();renderTeachers();setTimeout(()=>window.v123SyncNow?.(),0)}}
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-action],[data-edit],[data-delete],[data-profile],[data-profile-performance],[data-profile-edit],[data-profile-print],[data-profile-close],[data-idcard],[data-dash],[data-teacher-profile],[data-teacher-profile-edit],[data-teacher-profile-print],[data-teacher-profile-close],[data-teacher-edit],[data-teacher-delete],[data-att-id],[data-fee-collect],[data-fee-set],[data-fee-receipt],[data-fee-delete]');
@@ -2115,6 +2115,23 @@ document.getElementById('v77TogglePassword')?.addEventListener('click',()=>{cons
 function randomPassword(prefix){const a=new Uint32Array(4);if(window.crypto?.getRandomValues)crypto.getRandomValues(a);else for(let i=0;i<a.length;i++)a[i]=Math.floor(Math.random()*0xffffffff);return prefix+'@'+Array.from(a).map(n=>(n>>>0).toString(36)).join('').slice(0,8)+'9'}
 function uniqueUsername(base){let u=base,n=2;while(users.some(x=>x.username===u)){u=base+'_'+n++}return u}
 function guardianKey(student){return String(student.mobile||'').trim()+'|'+String(student.father||student.mother||'').trim().toLowerCase()}
+function ensureTeacherAccount(teacher,quiet){
+ if(!teacher||!teacher.id)return null;
+ const role=String(teacher.role||'Teacher').toLowerCase();
+ if(!role.includes('teacher'))return null;
+ let u=users.find(x=>x.role==='teacher'&&String(x.teacherId||'')===String(teacher.id));
+ if(u){if(!u.empId)u.empId=teacher.empId||'';if(!u.name)u.name=teacher.name+' (Teacher)';persistUsers();renderUsers();return {username:u.username,password:u.initialPassword||u.password,created:false,user:u};}
+ const emp=String(teacher.empId||'').trim();
+ if(!emp)return null;
+ const base='TCH_'+emp.replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+ const un=uniqueUsername(base);
+ const pw=randomPassword('Tch');
+ u={id:'u_tch_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),name:teacher.name+' (Teacher)',username:un,password:pw,initialPassword:pw,role:'teacher',teacherId:teacher.id,empId:emp};
+ users.push(u);
+ persistUsers();renderUsers();
+ return {username:un,password:pw,created:true,user:u};
+}
+window.v77CreateTeacherAccount=ensureTeacherAccount;
 function ensurePortalAccounts(student,quiet){
  if(!student||!student.id)return null;
  let made=[];
@@ -2171,7 +2188,7 @@ if(!current())setTimeout(showLogin,0);
 })();
 </script>
 <script>
-/* V146 Single Safe All-Device Sync Engine • robust deletion identity + manual sync */
+/* V148 Teacher Add/Employee ID Fix • V146 Safe All-Device Sync Engine • robust deletion identity + manual sync */
 (function(){
 const CFG='nms_v80_cloud_config', PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base', DIRTY='nms_v131_dirty', APPLY='nms_v131_applying';
 let client=null,busy=false,timer=null,applying=false;
@@ -2238,7 +2255,8 @@ async function sync(reason){
     return norm(d.name)&&norm(d.name)===norm(x?.name)&&norm(d.cls)===norm(x?.cls)&&norm(d.mobile)===norm(x?.mobile);
   });
   const teacherDeleted=x=>deletedTeachers.some(d=>{
-    if(d.id!=null&&String(d.id)===String(x?.id))return true;
+    if(d.id!=null&&String(d.id)!==''&&String(d.id)===String(x?.id))return true;
+    if(d.id!=null&&String(d.id)!=='')return false;
     if(norm(d.empId)&&norm(d.empId)===norm(x?.empId))return true;
     if(norm(d.email)&&norm(d.email)===norm(x?.email))return true;
     return norm(d.name)&&norm(d.name)===norm(x?.name)&&norm(d.mobile)===norm(x?.mobile);
@@ -2340,7 +2358,7 @@ async function sync(reason){
   }
   if(changed.length)refresh(changed);
   status(true,'Connected + Logged in');
-  info('V146 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
+  info('V148 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
  }catch(e){
   console.warn('V146 sync:',e); status(false,'Connected + Logged in • Sync Error');
   info('sync error • '+String(e.message||e).slice(0,140));
