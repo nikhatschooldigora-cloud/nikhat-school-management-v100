@@ -2463,6 +2463,30 @@ async function pullCloudSilently(reason){
     const deleted=getDeleted();
     let changed=0,conflicts=0,pushed=0;
 
+    // V130: authoritative record-union reconciliation. For keyed array datasets
+    // (students, teachers/staff and other lists with stable IDs), never let a
+    // smaller side overwrite a larger side merely because its timestamp is newer.
+    // Reconcile actual records first, then write the combined dataset to Cloud.
+    for(const r of rows){
+      if(r.key===DELETED)continue;
+      const localValue=readJson(r.key);
+      const cloudValue=typeof r.value==='string'?readMaybe(r.value):r.value;
+      if(Array.isArray(localValue)&&Array.isArray(cloudValue)&&localValue.length!==cloudValue.length){
+        const merged=mergeTwoWay(localValue,cloudValue,'local');
+        if(Array.isArray(merged)&&merged.length>=Math.max(localValue.length,cloudValue.length)&&!same(merged,cloudValue)){
+          const raw=JSON.stringify(merged);
+          if(safeLocalSet(r.key,raw)){
+            applyCloudValueToMemory(r.key,merged);
+            const ts=Math.max(Date.now(),new Date(r.updated_at||0).getTime()+1);
+            const up=await client.from('school_kv').upsert({key:r.key,value:clone(merged),updated_at:new Date(ts).toISOString()},{onConflict:'key'});
+            if(up.error)throw up.error;
+            meta[r.key]=ts;base[r.key]=baseSafeClone(merged);clearDirty(r.key);clearDeleted(r.key);
+            changed++;pushed++;
+          }
+        }
+      }
+    }
+
     // V125: propagate deletions through a small cloud tombstone map.
     // A record timestamp newer than its tombstone always wins, so recreating a
     // deleted record does not get erased on the next device.
