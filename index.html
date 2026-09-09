@@ -2194,6 +2194,7 @@ window.v80Upload=upload;window.v80Download=download;window.v80Test=testConnectio
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script>
+<script>
 /* V84 Cloud Safety & Recovery */
 (function(){
   const CFG='nms_v80_cloud_config', PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base';
@@ -2464,7 +2465,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   window.v88FeeStructure={render,saveStructure,apply,upload};setTimeout(render,50);
 })();
 </script>
-\n<script id="v89-fee-dashboard-js">
+<script id="v89-fee-dashboard-js">
 (function(){
   function n(v){const x=Number(v);return Number.isFinite(x)?x:0}
   function fmt(v){try{return money(v)}catch(e){return '₹'+n(v).toLocaleString('en-IN')}}
@@ -2493,7 +2494,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   document.getElementById('v89PrintDueList')?.addEventListener('click',printDue);
   setTimeout(render,200);
 })();
-</script>\n
+</script>
 <script id="v90StudentFeeProfileScript">
 (function(){
   function feeEntry(id){
