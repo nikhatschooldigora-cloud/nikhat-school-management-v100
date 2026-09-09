@@ -777,16 +777,21 @@ window.nmsGetStudentsV122=function(){return Array.isArray(students)?students:[]}
 function normalizeStudents(){students=students.map((s,i)=>({...s,id:s.id||uid(),mother:s.mother||'',father:s.father||s.parent||'',dob:s.dob||'',gender:s.gender||'',samagra:s.samagra||'',aadhaar:s.aadhaar||'',address:s.address||'',photo:s.photo||'',mobile:s.mobile||'',adm:s.adm||('NMS'+String(i+1).padStart(3,'0')),name:s.name||'',cls:s.cls||'1'}));
  const seen=new Set(); students=students.filter(s=>{const k=String(s.adm).toLowerCase()+'|'+String(s.name).trim().toLowerCase()+'|'+String(s.mobile);if(seen.has(k))return false;seen.add(k);return true}); save();}
 function freeLocalStorageForSync(){
-  // Keep the live data keys; remove only redundant local copies that can consume
-  // the browser's small localStorage quota. Safety backups are downloadable via
-  // the Backup & Restore module and are no longer duplicated on every save.
+  // Keep the live school data keys. Remove only redundant/diagnostic copies
+  // that can consume the browser's small localStorage quota. Downloadable
+  // Device/Cloud Backups remain separate safety copies.
   try{
     const core=localStorage.getItem('nms_students');
     if(core!==null){
       localStorage.removeItem('nms_students_backup');
       localStorage.removeItem('nms_full_autobackup');
-      for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(k&&k.startsWith('nms_v82_conflict_'))localStorage.removeItem(k)}
     }
+    const drop=[];
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k&&(/^nms_v82_conflict_/.test(k)||/^nms_v\d+_conflicts$/.test(k)))drop.push(k);
+    }
+    drop.forEach(k=>localStorage.removeItem(k));
   }catch(e){console.warn('Storage cleanup unavailable',e)}
 }
 function save(){
@@ -2131,7 +2136,7 @@ if(!current())setTimeout(showLogin,0);
 })();
 </script>
 <script>
-/* V126 Supabase Cloud Database + Live All-Device Sync */
+/* V127 Supabase Cloud Database + Live All-Device Sync */
 (function(){
 const CFG='nms_v80_cloud_config', KEY_PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base', DIRTY='nms_v123_dirty_meta', DELETED='nms_sync_deleted';
 let syncApplying=false;
@@ -2210,7 +2215,7 @@ function cloudKeys(){
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
     if(!k||!k.startsWith(KEY_PREFIX)||k===CFG)continue;
-    if(k.startsWith('nms_v82_sync_')||k.startsWith('nms_v82_conflict')||k.startsWith('nms_v123_')||k===DELETED)continue;
+    if(k.startsWith('nms_v82_sync_')||k.startsWith('nms_v82_conflict')||k.startsWith('nms_v123_')||/^nms_v\d+_conflicts$/.test(k)||k===DELETED)continue;
     if(k==='nms_students_backup'||k==='nms_full_autobackup'||k==='nms_remember_login_v77')continue;
     out.push(k);
   }
@@ -2259,7 +2264,7 @@ function recordSyncConflict(key,localValue,cloudValue){
   // contain photos and push the browser over its ~5MB quota. Keep only a small
   // diagnostic entry and de-duplicate repeated reports for the same key.
   try{
-    const storeKey='nms_v126_conflicts';
+    const storeKey='nms_v127_conflicts';
     const arr=JSON.parse(localStorage.getItem(storeKey)||'[]');
     const item={key:String(key),detectedAt:new Date().toISOString(),localSize:JSON.stringify(localValue??null).length,cloudSize:JSON.stringify(cloudValue??null).length};
     const lastSame=[...arr].reverse().find(x=>x&&x.key===item.key);
@@ -2272,7 +2277,7 @@ function recordSyncConflict(key,localValue,cloudValue){
 
 function renderSyncConflicts(){
   const el=document.getElementById('v122ConflictInfo');if(!el)return;
-  let arr=[];try{arr=JSON.parse(localStorage.getItem('nms_v126_conflicts')||'[]')}catch(e){}
+  let arr=[];try{arr=JSON.parse(localStorage.getItem('nms_v127_conflicts')||'[]')}catch(e){}
   if(!arr.length){el.innerHTML='<b>कोई saved conflict नहीं है.</b>';return}
   const rows=arr.slice().reverse().map((x,i)=>{
     const when=x.detectedAt?new Date(x.detectedAt).toLocaleString():'—';
@@ -2283,7 +2288,39 @@ function renderSyncConflicts(){
   el.innerHTML='<b>कुल saved conflicts: '+arr.length+'</b>'+rows;
 }
 
+function mergeTwoWay(local,cloud,prefer='cloud'){
+  const ids=['id','_id','adm','admission','admissionNo','scholarNo','username','key'];
+  const getId=o=>{if(!o||typeof o!=='object')return null;for(const k of ids)if(o[k]!==undefined&&o[k]!==null&&String(o[k])!=='')return k+'='+String(o[k]);return null};
+  const deep=(l,c)=>{
+    if(l===undefined||l===null)return clone(c);
+    if(c===undefined||c===null)return clone(l);
+    if(same(l,c))return clone(l);
+    if(Array.isArray(l)&&Array.isArray(c)){
+      const keyed=l.length===0||c.length===0||l.every(x=>getId(x))&&c.every(x=>getId(x));
+      if(keyed){
+        const lm=new Map(l.map(x=>[getId(x),x])),cm=new Map(c.map(x=>[getId(x),x]));
+        const order=[]; c.forEach(x=>{const id=getId(x);if(id!==null&&!order.includes(id))order.push(id)}); l.forEach(x=>{const id=getId(x);if(id!==null&&!order.includes(id))order.push(id)});
+        return order.map(id=>deep(lm.get(id),cm.get(id)));
+      }
+      const out=[],seen=new Set();
+      for(const x of [...c,...l]){let sig;try{sig=JSON.stringify(x)}catch(e){sig=String(x)}if(!seen.has(sig)){seen.add(sig);out.push(clone(x))}}
+      return out;
+    }
+    if(l&&c&&typeof l==='object'&&typeof c==='object'&&!Array.isArray(l)&&!Array.isArray(c)){
+      const out={},keys=new Set([...Object.keys(c),...Object.keys(l)]);
+      for(const k of keys)out[k]=deep(l[k],c[k]);
+      return out;
+    }
+    return clone(prefer==='local'?l:c);
+  };
+  return deep(local,cloud);
+}
+
 function mergeRecords(base,local,cloud,prefer='cloud'){
+  // When this device has no base snapshot yet, this is a first-seen dataset.
+  // Never replace a larger local dataset with a smaller cloud dataset; merge
+  // both sides so a 20-student laptop plus a 2-student cloud becomes 20.
+  if(base===undefined||base===null)return mergeTwoWay(local,cloud,prefer);
   // Recursive three-way merge.  This is important for fees/attendance/marks,
   // whose values contain nested objects.  V125 compared only the first level,
   // so two harmless edits inside different nested fields could be reported as
@@ -2474,7 +2511,10 @@ async function pullCloudSilently(reason){
       }
       if(cloudTime>known){
         const oldBase=base[r.key];
-        if(localValue!==null&&oldBase!==undefined&&!same(localValue,oldBase)&&!same(localValue,cloudValue)){
+        // First time this device sees an existing cloud key: reconcile both
+        // datasets instead of blindly downloading the cloud copy. This fixes
+        // the exact case where laptop has 20 students but cloud has 2.
+        if(localValue!==null&&!same(localValue,cloudValue)&&(oldBase===undefined||(!same(localValue,oldBase)))){
           const merged=mergeRecords(oldBase,localValue,cloudValue);
           if(merged!==null){
             if(safeLocalSet(r.key,JSON.stringify(merged))){applyCloudValueToMemory(r.key,merged);base[r.key]=baseSafeClone(merged);meta[r.key]=cloudTime;changed++;}
@@ -2514,7 +2554,7 @@ async function pullCloudSilently(reason){
     if((changed||pushed)&&reason==='startup')setStatus(true,'Connected + Logged in • Sync updated');
     return true;
   }catch(e){
-    console.warn('V126 auto sync:',e);
+    console.warn('V127 auto sync:',e);
     const msg=String(e?.message||e||'Unknown sync error').replace(/\s+/g,' ').trim();
     setStatus(true,'Connected + Logged in • Sync Error');
     autoSyncInfo('sync error • '+msg.slice(0,140));
@@ -2591,14 +2631,14 @@ function installAutoUpload(){
   Storage.prototype.setItem=function(k,v){
     const before=this===localStorage?readJson(k):null;
     origSet.call(this,k,v);
-    if(this===localStorage&&!syncApplying&&k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict_')&&!k.startsWith('nms_v123_')){
+    if(this===localStorage&&!syncApplying&&k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict_')&&!k.startsWith('nms_v123_')&&!/^nms_v\d+_conflicts$/.test(k)){
       markDirty(k);clearDeleted(k);
       scheduleAutoSync('local change');
     }
   };
   Storage.prototype.removeItem=function(k){
     origRemove.call(this,k);
-    if(this===localStorage&&!syncApplying&&k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict_')&&!k.startsWith('nms_v123_')){
+    if(this===localStorage&&!syncApplying&&k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict_')&&!k.startsWith('nms_v123_')&&!/^nms_v\d+_conflicts$/.test(k)){
       markDirty(k);markDeleted(k);
       scheduleAutoSync('local delete');
     }
