@@ -2264,7 +2264,7 @@ function recordSyncConflict(key,localValue,cloudValue){
   // contain photos and push the browser over its ~5MB quota. Keep only a small
   // diagnostic entry and de-duplicate repeated reports for the same key.
   try{
-    const storeKey='nms_v127_conflicts';
+    const storeKey='nms_v129_conflicts';
     const arr=JSON.parse(localStorage.getItem(storeKey)||'[]');
     const item={key:String(key),detectedAt:new Date().toISOString(),localSize:JSON.stringify(localValue??null).length,cloudSize:JSON.stringify(cloudValue??null).length};
     const lastSame=[...arr].reverse().find(x=>x&&x.key===item.key);
@@ -2277,7 +2277,7 @@ function recordSyncConflict(key,localValue,cloudValue){
 
 function renderSyncConflicts(){
   const el=document.getElementById('v122ConflictInfo');if(!el)return;
-  let arr=[];try{arr=JSON.parse(localStorage.getItem('nms_v127_conflicts')||'[]')}catch(e){}
+  let arr=[];try{arr=JSON.parse(localStorage.getItem('nms_v129_conflicts')||'[]')}catch(e){}
   if(!arr.length){el.innerHTML='<b>कोई saved conflict नहीं है.</b>';return}
   const rows=arr.slice().reverse().map((x,i)=>{
     const when=x.detectedAt?new Date(x.detectedAt).toLocaleString():'—';
@@ -2433,6 +2433,20 @@ async function pushKeyConflictSafe(k, localValue, force=false){
 
 function readMaybe(v){try{return JSON.parse(v)}catch(e){return v}}
 
+function preferLargerLocalDataset(localValue,cloudValue){
+  // On a device that already has the complete local dataset, its base snapshot
+  // can legitimately equal that dataset. If Cloud is an older/smaller copy,
+  // the old V127 condition treated the cloud row as authoritative and could
+  // reduce 20 local students to 2. For record arrays, prefer reconciliation
+  // whenever local has more keyed records than cloud.
+  if(Array.isArray(localValue)&&Array.isArray(cloudValue)){
+    const ids=['id','_id','adm','admission','admissionNo','scholarNo','username','key'];
+    const hasId=o=>o&&typeof o==='object'&&ids.some(k=>o[k]!==undefined&&o[k]!==null&&String(o[k])!=='');
+    if(localValue.every(hasId)&&cloudValue.every(hasId)) return localValue.length>cloudValue.length;
+  }
+  return false;
+}
+
 async function pullCloudSilently(reason){
   if(syncBusy)return false;
   syncBusy=true;
@@ -2514,8 +2528,8 @@ async function pullCloudSilently(reason){
         // First time this device sees an existing cloud key: reconcile both
         // datasets instead of blindly downloading the cloud copy. This fixes
         // the exact case where laptop has 20 students but cloud has 2.
-        if(localValue!==null&&!same(localValue,cloudValue)&&(oldBase===undefined||(!same(localValue,oldBase)))){
-          const merged=mergeRecords(oldBase,localValue,cloudValue);
+        if(localValue!==null&&!same(localValue,cloudValue)&&(oldBase===undefined||(!same(localValue,oldBase))||preferLargerLocalDataset(localValue,cloudValue))){
+          const merged=preferLargerLocalDataset(localValue,cloudValue)?mergeTwoWay(localValue,cloudValue,'local'):mergeRecords(oldBase,localValue,cloudValue);
           if(merged!==null){
             if(safeLocalSet(r.key,JSON.stringify(merged))){applyCloudValueToMemory(r.key,merged);base[r.key]=baseSafeClone(merged);meta[r.key]=cloudTime;changed++;}
             const ts=Math.max(Date.now(),cloudTime+1);
