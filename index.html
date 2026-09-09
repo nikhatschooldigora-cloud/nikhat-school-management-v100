@@ -365,7 +365,7 @@ if(document.readyState!=='loading'){} else {}
 <section class="page hidden" id="guardianPortal">
 <div class="panel"><div class="sectionHead"><div><h2>👨‍👩‍👧 Guardian Portal / अभिभावक पोर्टल</h2><p class="muted">Guardian अपने linked सभी बच्चों की profile, attendance, homework, notices, timetable, fees और results देख सकता है.</p></div><span class="v122-portal-badge">Guardian View</span></div><div id="guardianPortalContent"></div></div>
 </section>
-<section class="page hidden" id="userManagement"><div class="panel"><div class="sectionHead"><div><h2>🔐 Users & Permissions / यूज़र एवं अनुमति</h2><p class="muted">Admin can create users, assign roles, and automatically generate Student/Guardian login accounts.</p></div></div><div class="toolbar v77-user-form"><label>Full Name / नाम<input id="v77Name" placeholder="Teacher Name"></label><label>Username / यूज़रनेम<input id="v77Username" placeholder="teacher01"></label><label>Password / पासवर्ड<input id="v77Password" type="password" placeholder="Password"></label><label>Role / भूमिका<select id="v77Role"><option value="admin">Admin</option><option value="principal">Principal</option><option value="teacher">Teacher</option><option value="accountant">Accountant</option><option value="office">Office Staff</option><option value="student">Student</option><option value="guardian">Guardian</option></select></label><button class="primary" id="v77SaveUser" type="button">💾 Save User</button><button class="secondary" id="v77ClearUser" type="button">🧹 Clear</button> <button class="secondary" id="v122GenerateAccounts" type="button">🔑 Generate Missing Student/Guardian Accounts</button></div><div id="v77UserTable" class="tablewrap" style="margin-top:14px"></div><div class="v77-note"><b>Account automation:</b> नए students के लिए Student और Guardian Login ID/password अपने-आप बनेंगे. Existing students के लिए ऊपर <b>Generate Missing Student/Guardian Accounts</b> दबाएँ.</div><div class="v77-note">ये browser/device-based accounts हैं. वास्तविक multi-device secure login और central data sync के लिए Supabase/Auth setup जरूरी है.</div></div></section>
+<section class="page hidden" id="userManagement"><div class="panel"><div class="sectionHead"><div><h2>🔐 Users & Permissions / यूज़र एवं अनुमति</h2><p class="muted">Admin can create users, assign roles, and automatically generate Student/Guardian login accounts.</p></div></div><div class="toolbar v77-user-form"><label>Full Name / नाम<input id="v77Name" placeholder="Teacher Name"></label><label>Username / यूज़रनेम<input id="v77Username" placeholder="teacher01"></label><label>Password / पासवर्ड<div style="display:flex;gap:6px;align-items:center"><input id="v77Password" type="password" placeholder="Password" style="flex:1"><button class="secondary" id="v77TogglePassword" type="button" title="Show/Hide password">👁️</button></div></label><label>Role / भूमिका<select id="v77Role"><option value="admin">Admin</option><option value="principal">Principal</option><option value="teacher">Teacher</option><option value="accountant">Accountant</option><option value="office">Office Staff</option><option value="student">Student</option><option value="guardian">Guardian</option></select></label><button class="primary" id="v77SaveUser" type="button">💾 Save User</button><button class="secondary" id="v77ClearUser" type="button">🧹 Clear</button> <button class="secondary" id="v122GenerateAccounts" type="button">🔑 Generate Missing Student/Guardian Accounts</button></div><div id="v77UserTable" class="tablewrap" style="margin-top:14px"></div><div class="v77-note"><b>Account automation:</b> नए students के लिए Student और Guardian Login ID/password अपने-आप बनेंगे. Existing students के लिए ऊपर <b>Generate Missing Student/Guardian Accounts</b> दबाएँ.</div><div class="v77-note">ये browser/device-based accounts हैं. वास्तविक multi-device secure login और central data sync के लिए Supabase/Auth setup जरूरी है.</div></div></section>
 <section class="page hidden" id="centralDatabase">
 <div class="panel">
 <div class="sectionHead"><div><h2>☁️ Cloud Database / क्लाउड डेटाबेस</h2><p class="muted">V80: Free Supabase cloud database से Android, laptop और दूसरे devices का school data एक जगह sync.</p></div><span class="v78-status" id="v80Status"><span class="v78-dot" id="v80Dot"></span><span id="v80StatusText">Local Mode • Cloud Setup Required</span></span></div>
@@ -759,6 +759,8 @@ function loadXLSX(callback){
 }
 </script>
 <script>
+/* V145 FIX: expose student-write permission globally. V145 defined canStudentWrite inside the V77 IIFE, so Add Student raised "canStudentWrite is not defined" in the main app and V121 bulk handler. */
+function canStudentWrite(){try{const raw=sessionStorage.getItem('nms_login_v77');const u=raw?JSON.parse(raw):null;return !!u&&['admin','principal','accountant'].includes(u.role)}catch(e){return false}}
 const CLASSES=['LKG','UKG','1','2','3','4','5','6','7','8','9','10'];
 let students=JSON.parse(localStorage.getItem('nms_students')||'[]');
 let teachers=JSON.parse(localStorage.getItem('nms_teachers')||'[]');
@@ -1086,7 +1088,8 @@ window.printPerformance=printPerformance;
 function printPerformance(){
   const el=document.getElementById('printPerformance');if(!el){alert('Pehle student performance dekhein.');return}
   const w=window.open('','_blank');if(!w){alert('Popup blocked.');return}
-  w.document.write(`<html><head><title>Student Performance - Nikhat Middle School Digora</title><style>.print-school-head{display:flex;align-items:center;justify-content:center;gap:12px;text-align:center}.print-school-head img{image-rendering:auto;width:70px!important;height:70px!important;max-width:70px!important;max-height:70px!important;object-fit:contain;border-radius:50%;flex:0 0 70px}@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#111}.class-result-print{padding:12px}.result-title{text-align:center;margin-bottom:15px}.result-title h3{margin:0 0 5px}.class-result-print table{width:100%;border-collapse:collapse}.class-result-print th,.class-result-print td{border:1px solid #888;padding:5px 4px;text-align:center;font-size:10px}.class-result-print th:first-child,.class-result-print td:first-child{text-align:left}</style></head><body>${el.outerHTML}<script>window.onload=function(){window.print()}<\/script></body></html>`);w.document.close();
+  w.document.write(`<html><head><title>Student Performance - Nikhat Middle School Digora</title><style>.print-school-head{display:flex;align-items:center;justify-content:center;gap:12px;text-align:center}.print-school-head img{image-rendering:auto;width:70px!important;height:70px!important;max-width:70px!important;max-height:70px!important;object-fit:contain;border-radius:50%;flex:0 0 70px}@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#111}.class-result-print{padding:12px}.result-title{text-align:center;margin-bottom:15px}.result-title h3{margin:0 0 5px}.class-result-print table{width:100%;border-collapse:collapse}.class-result-print th,.class-result-print td{border:1px solid #888;padding:5px 4px;text-align:center;font-size:10px}.class-result-print th:first-child,.class-result-print td:first-child{text-align:left}</style></head><body>${el.outerHTML}<script>window.onload=function(){window.print()}<\/script>
+</body></html>`);w.document.close();
 }
 
 function printClassResult(){
@@ -1319,10 +1322,10 @@ function printTeacherProfile(id){const schoolLogo=getSchoolLogo();const t=teache
 function showModal(){const m=document.getElementById('modal');m.classList.remove('hidden');m.style.display='flex';m.setAttribute('aria-hidden','false')}
 function closeModal(){const m=document.getElementById('modal');m.classList.add('hidden');m.style.display='none';m.setAttribute('aria-hidden','true');editingStudentId=null;editingTeacherId=null;photoData='';teacherPhotoData=''}
 function resetStudentForm(){['fAdm','fName','fFather','fMother','fMobile','fSamagra','fAadhaar','fAddress'].forEach(id=>document.getElementById(id).value='');['fClass','fGender','fDob'].forEach(id=>document.getElementById(id).value='');document.getElementById('fPhoto').value='';document.getElementById('fCamera').value='';photoData='';document.getElementById('photoPreview').removeAttribute('src');document.getElementById('photoPreview').classList.remove('show')}
-function openStudent(id=null){editingStudentId=id;document.getElementById('modalTitle').textContent=id?'Edit Student / विद्यार्थी संशोधित करें':'Add Student / विद्यार्थी जोड़ें';document.getElementById('studentFormBox').style.display='grid';document.getElementById('teacherFormBox').style.display='none';document.getElementById('studentActions').style.display='flex';if(id){const s=students.find(x=>x.id===id);if(!s)return;document.getElementById('fAdm').value=s.adm;document.getElementById('fName').value=s.name;document.getElementById('fClass').value=s.cls;document.getElementById('fGender').value=s.gender;document.getElementById('fDob').value=s.dob;document.getElementById('fFather').value=s.father;document.getElementById('fMother').value=s.mother;document.getElementById('fMobile').value=s.mobile;document.getElementById('fSamagra').value=s.samagra;document.getElementById('fAadhaar').value=s.aadhaar;document.getElementById('fAddress').value=s.address;photoData=s.photo||'';if(photoData){document.getElementById('photoPreview').src=photoData;document.getElementById('photoPreview').classList.add('show')}}else resetStudentForm();showModal();setTimeout(()=>document.getElementById('fName').focus(),50)}
+function openStudent(id=null){if(!canStudentWrite()){alert('Student add/update की अनुमति केवल Admin, Principal और Accountant को है।');return}editingStudentId=id;document.getElementById('modalTitle').textContent=id?'Edit Student / विद्यार्थी संशोधित करें':'Add Student / विद्यार्थी जोड़ें';document.getElementById('studentFormBox').style.display='grid';document.getElementById('teacherFormBox').style.display='none';document.getElementById('studentActions').style.display='flex';if(id){const s=students.find(x=>x.id===id);if(!s)return;document.getElementById('fAdm').value=s.adm;document.getElementById('fName').value=s.name;document.getElementById('fClass').value=s.cls;document.getElementById('fGender').value=s.gender;document.getElementById('fDob').value=s.dob;document.getElementById('fFather').value=s.father;document.getElementById('fMother').value=s.mother;document.getElementById('fMobile').value=s.mobile;document.getElementById('fSamagra').value=s.samagra;document.getElementById('fAadhaar').value=s.aadhaar;document.getElementById('fAddress').value=s.address;photoData=s.photo||'';if(photoData){document.getElementById('photoPreview').src=photoData;document.getElementById('photoPreview').classList.add('show')}}else resetStudentForm();showModal();setTimeout(()=>document.getElementById('fName').focus(),50)}
 function resetTeacherForm(){['tEmpId','tName','tDob','tJoining','tRole','tSubject','tQualification','tMobile','tEmail','tAadhaar','tSalary','tAddress'].forEach(id=>document.getElementById(id).value='');document.getElementById('tGender').value='';document.getElementById('tPhoto').value='';document.getElementById('tCamera').value='';teacherPhotoData='';document.getElementById('teacherPhotoPreview').removeAttribute('src');document.getElementById('teacherPhotoPreview').classList.remove('show');document.getElementById('tRole').value='Teacher'}
 function openTeacher(id=null){editingTeacherId=id;document.getElementById('modalTitle').textContent=id?'Edit Teacher / शिक्षक संशोधित करें':'Add Teacher / शिक्षक जोड़ें';document.getElementById('studentFormBox').style.display='none';document.getElementById('teacherFormBox').style.display='grid';document.getElementById('studentActions').style.display='none';if(id){const t=teachers.find(x=>x.id===id);if(!t)return;document.getElementById('tEmpId').value=t.empId;document.getElementById('tName').value=t.name;document.getElementById('tGender').value=t.gender;document.getElementById('tDob').value=t.dob;document.getElementById('tJoining').value=t.joining;document.getElementById('tRole').value=t.role;document.getElementById('tSubject').value=t.subject;document.getElementById('tQualification').value=t.qualification;document.getElementById('tMobile').value=t.mobile;document.getElementById('tEmail').value=t.email;document.getElementById('tAadhaar').value=t.aadhaar;document.getElementById('tSalary').value=t.salary;document.getElementById('tAddress').value=t.address;teacherPhotoData=t.photo||'';if(teacherPhotoData){document.getElementById('teacherPhotoPreview').src=teacherPhotoData;document.getElementById('teacherPhotoPreview').classList.add('show')}}else resetTeacherForm();showModal();setTimeout(()=>document.getElementById('tName').focus(),50)}
-function addStudent(){if(savingStudent)return;const name=document.getElementById('fName').value.trim(),cls=document.getElementById('fClass').value,admInput=document.getElementById('fAdm').value.trim(),adm=admInput||'NMS'+String(students.length+1).padStart(3,'0');if(!name)return alert('कृपया विद्यार्थी का नाम भरें');if(!cls)return alert('कृपया कक्षा चुनें');if(!editingStudentId&&students.some(s=>s.adm.toLowerCase()===adm.toLowerCase()))return alert('यह Admission No. पहले से मौजूद है');if(document.getElementById('fMobile').value && !/^\d{10}$/.test(document.getElementById('fMobile').value.trim()))return alert('Mobile number 10 digits का होना चाहिए');if(document.getElementById('fAadhaar').value && !/^\d{12}$/.test(document.getElementById('fAadhaar').value.trim()))return alert('Aadhaar Number 12 digits का होना चाहिए');savingStudent=true;document.getElementById('saveStudentBtn').disabled=true;const data={adm,name,cls,gender:document.getElementById('fGender').value,dob:document.getElementById('fDob').value,father:document.getElementById('fFather').value.trim(),mother:document.getElementById('fMother').value.trim(),mobile:document.getElementById('fMobile').value.trim(),samagra:document.getElementById('fSamagra').value.trim(),aadhaar:document.getElementById('fAadhaar').value.trim(),address:document.getElementById('fAddress').value.trim(),photo:photoData};if(editingStudentId){const i=students.findIndex(s=>s.id===editingStudentId);if(i>=0)students[i]={...students[i],...data}}else {const ns={...data,id:uid()};students.push(ns);save();const creds=window.v77CreatePortalAccounts&&window.v77CreatePortalAccounts(ns);if(creds)alert('Student saved.\n\nStudent Login: '+creds.student.username+' / '+creds.student.password+'\nGuardian Login: '+creds.guardian.username+' / '+creds.guardian.password+'\n\nCredentials Users & Permissions में भी उपलब्ध हैं।')}save();closeModal();updateDash();renderStudents();renderClasses();showPage('students');alert(editingStudentId?'विद्यार्थी की जानकारी अपडेट हो गई':'विद्यार्थी सफलतापूर्वक सेव हो गया');savingStudent=false;document.getElementById('saveStudentBtn').disabled=false}
+function addStudent(){if(!canStudentWrite()){alert('Student add/update की अनुमति केवल Admin, Principal और Accountant को है।');return}if(savingStudent)return;const name=document.getElementById('fName').value.trim(),cls=document.getElementById('fClass').value,admInput=document.getElementById('fAdm').value.trim(),adm=admInput||'NMS'+String(students.length+1).padStart(3,'0');if(!name)return alert('कृपया विद्यार्थी का नाम भरें');if(!cls)return alert('कृपया कक्षा चुनें');if(!editingStudentId&&students.some(s=>s.adm.toLowerCase()===adm.toLowerCase()))return alert('यह Admission No. पहले से मौजूद है');if(document.getElementById('fMobile').value && !/^\d{10}$/.test(document.getElementById('fMobile').value.trim()))return alert('Mobile number 10 digits का होना चाहिए');if(document.getElementById('fAadhaar').value && !/^\d{12}$/.test(document.getElementById('fAadhaar').value.trim()))return alert('Aadhaar Number 12 digits का होना चाहिए');savingStudent=true;document.getElementById('saveStudentBtn').disabled=true;const data={adm,name,cls,gender:document.getElementById('fGender').value,dob:document.getElementById('fDob').value,father:document.getElementById('fFather').value.trim(),mother:document.getElementById('fMother').value.trim(),mobile:document.getElementById('fMobile').value.trim(),samagra:document.getElementById('fSamagra').value.trim(),aadhaar:document.getElementById('fAadhaar').value.trim(),address:document.getElementById('fAddress').value.trim(),photo:photoData};if(editingStudentId){const i=students.findIndex(s=>s.id===editingStudentId);if(i>=0)students[i]={...students[i],...data}}else {const ns={...data,id:uid()};students.push(ns);save();const creds=window.v77CreatePortalAccounts&&window.v77CreatePortalAccounts(ns);if(creds)alert('Student saved.\n\nStudent Login: '+creds.student.username+' / '+creds.student.password+'\nGuardian Login: '+creds.guardian.username+' / '+creds.guardian.password+'\n\nCredentials Users & Permissions में भी उपलब्ध हैं।')}save();closeModal();updateDash();renderStudents();renderClasses();showPage('students');alert(editingStudentId?'विद्यार्थी की जानकारी अपडेट हो गई':'विद्यार्थी सफलतापूर्वक सेव हो गया');savingStudent=false;document.getElementById('saveStudentBtn').disabled=false}
 function money(n){return '₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2})}
 const DEFAULT_CURRENT_SESSION='2026-27';
 function feeSessionKey(){return String(document.getElementById('currentFeeSession')?.value||localStorage.getItem('nms_current_fee_session')||DEFAULT_CURRENT_SESSION)}
@@ -1505,7 +1508,7 @@ document.addEventListener('click',e=>{
     if(d.feeReceipt){const [sid,tid]=d.feeReceipt.split('|');printReceipt(sid,tid);return;}
     if(d.feeDelete){const [sid,tid]=d.feeDelete.split('|');deleteFee(sid,tid);return;}
     const a=d.action;
-    if(a==='openStudent')openStudent();else if(a==='openTeacher')openTeacher();else if(a==='attendance')showPage('attendance');else if(a==='fees')showPage('fees');else if(a==='openFee'||a==='feeSave')openFee();else if(a==='noticeSave')alert('Notice saved in this prototype.');
+    if(a==='openStudent'){if(!canStudentWrite()){alert('Student add/update की अनुमति केवल Admin, Principal और Accountant को है।');return}openStudent()}else if(a==='openTeacher')openTeacher();else if(a==='attendance')showPage('attendance');else if(a==='fees')showPage('fees');else if(a==='openFee'||a==='feeSave')openFee();else if(a==='noticeSave')alert('Notice saved in this prototype.');
   }catch(err){console.error('Student profile action error:',err);alert('Action में समस्या आई: '+(err&&err.message?err.message:'Unknown error'));}
 });
 
@@ -1661,9 +1664,9 @@ document.addEventListener('click',e=>{
 async function parseBulk(file){const ext=file.name.toLowerCase().split('.').pop();if(ext==='csv'){return csvFallback(await file.text())}if(ext==='xlsx'||ext==='xls'){if(window.XLSX){const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'});return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}const ok=await new Promise(resolve=>loadXLSX(resolve));if(!ok||!window.XLSX)throw new Error('Excel library load failed');const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'});return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}throw new Error('Unsupported file format')}
 function csvFallback(t){const lines=t.replace(/\r/g,'').split('\n').filter(x=>x.trim());if(!lines.length)return [];const split=s=>s.split(',').map(x=>x.trim().replace(/^"|"$/g,''));const heads=split(lines[0]);return lines.slice(1).map(line=>{const v=split(line),o={};heads.forEach((h,i)=>o[h]=v[i]??'');return o});}
 document.getElementById('downloadStudentTemplate')?.addEventListener('click',()=>{const rows=[{'Admission No':'1001','Student Name':'Example Student','Class':'6','Gender':'Male','DOB':'12/05/2014','Father Name':'Father Name','Mother Name':'Mother Name','Mobile':'9876543210','Samagra ID':'','Aadhaar':'','Address':'Village / City'}];if(window.XLSX){const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Students');XLSX.writeFile(wb,'Nikhat_Middle_School_Student_Template.xlsx');}else{const csv=Object.keys(rows[0]).join(',')+'\n'+Object.values(rows[0]).map(x=>'"'+x+'"').join(',');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='Nikhat_Middle_School_Student_Template.csv';a.click();}});
-document.getElementById('studentBulkFile')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;const st=document.getElementById('bulkUploadStatus');st.textContent='File read ho rahi hai...';try{const raw=await parseBulk(f);if(!raw.length){throw new Error('File me data rows nahi mili')}const mapped=raw.map(bulkMap),res=validateBulk(mapped);showBulk(res,raw.length);st.textContent=`${raw.length} rows read successfully.`}catch(err){console.error('Bulk upload:',err);st.textContent='File read nahi ho saki. Excel (.xlsx/.xls) ya CSV file check karein.';alert('Excel/CSV file read nahi ho saki. Agar Excel file hai to internet on karke dobara try karein; CSV offline bhi chalegi.\n\nError: '+(err?.message||err));}e.target.value=''});
+document.getElementById('studentBulkFile')?.addEventListener('change',async e=>{if(!canStudentWrite()){e.target.value='';alert('Bulk student update की अनुमति केवल Admin, Principal और Accountant को है।');return}const f=e.target.files?.[0];if(!f)return;const st=document.getElementById('bulkUploadStatus');st.textContent='File read ho rahi hai...';try{const raw=await parseBulk(f);if(!raw.length){throw new Error('File me data rows nahi mili')}const mapped=raw.map(bulkMap),res=validateBulk(mapped);showBulk(res,raw.length);st.textContent=`${raw.length} rows read successfully.`}catch(err){console.error('Bulk upload:',err);st.textContent='File read nahi ho saki. Excel (.xlsx/.xls) ya CSV file check karein.';alert('Excel/CSV file read nahi ho saki. Agar Excel file hai to internet on karke dobara try karein; CSV offline bhi chalegi.\n\nError: '+(err?.message||err));}e.target.value=''});
 document.getElementById('bulkCancel')?.addEventListener('click',()=>{bulkRows=[];document.getElementById('bulkPreviewWrap').style.display='none';document.getElementById('studentBulkFile').value='';});
-document.getElementById('bulkImport')?.addEventListener('click',()=>{if(!bulkRows.length){alert('Import karne ke liye valid students nahi hain.');return;}bulkRows.forEach(r=>students.push({id:uid(),adm:r.admissionNo,name:r.name,cls:r.className,gender:r.gender,dob:r.dob,father:r.father,mother:r.mother,mobile:r.mobile,samagra:r.samagra,aadhaar:r.aadhaar,address:r.address,photo:''}));save();renderStudents();renderClasses();updateDash();document.getElementById('bulkUploadStatus').textContent=`${bulkRows.length} students successfully imported.`;document.getElementById('bulkPreviewWrap').style.display='none';document.getElementById('studentBulkFile').value='';bulkRows=[];alert('Bulk student import complete.');});
+document.getElementById('bulkImport')?.addEventListener('click',()=>{if(!canStudentWrite()){alert('Bulk student update की अनुमति केवल Admin, Principal और Accountant को है।');return;}if(!bulkRows.length){alert('Import karne ke liye valid students nahi hain.');return;}bulkRows.forEach(r=>students.push({id:uid(),adm:r.admissionNo,name:r.name,cls:r.className,gender:r.gender,dob:r.dob,father:r.father,mother:r.mother,mobile:r.mobile,samagra:r.samagra,aadhaar:r.aadhaar,address:r.address,photo:''}));save();renderStudents();renderClasses();updateDash();document.getElementById('bulkUploadStatus').textContent=`${bulkRows.length} students successfully imported.`;document.getElementById('bulkPreviewWrap').style.display='none';document.getElementById('studentBulkFile').value='';bulkRows=[];alert('Bulk student import complete.');});
 
 /* Fees V27: robust direct handlers for Collect Fee. */
 window.openFee = openFee;
@@ -2074,7 +2077,10 @@ function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function persistUsers(){localStorage.setItem(KEY,JSON.stringify(users))}
 function current(){try{const raw=sessionStorage.getItem(SESSION);return raw?JSON.parse(raw):null}catch(e){return null}}
 function allowed(p){const u=current();return !!u&&(perms[u.role]||[]).includes(p)}
-function hideMenus(){const u=current();document.querySelectorAll('.nav button[data-page]').forEach(b=>{b.style.display=(u&&(perms[u.role]||[]).includes(b.dataset.page))?'':'none'});const badge=document.getElementById('v77UserBadge');if(badge)badge.textContent=u?(u.name+' • '+(rn[u.role]||u.role)):''}
+function canStudentWrite(){const u=current();return !!u&&['admin','principal','accountant'].includes(u.role)}
+function applyStudentWriteAccess(){const can=canStudentWrite();document.querySelectorAll('#bulkStudentPanel,[data-student-write],#studentActions').forEach(e=>{if(e)e.style.display=can?'':'none'});document.querySelectorAll('[data-action="openStudent"]').forEach(e=>{e.style.display=can?'':'none'});document.querySelectorAll('#studentRows .edit,#studentRows .del').forEach(e=>{e.style.display=can?'':'none'});}
+
+function hideMenus(){const u=current();document.querySelectorAll('.nav button[data-page]').forEach(b=>{b.style.display=(u&&(perms[u.role]||[]).includes(b.dataset.page))?'':'none'});const badge=document.getElementById('v77UserBadge');if(badge)badge.textContent=u?(u.name+' • '+(rn[u.role]||u.role)):'';applyStudentWriteAccess()}
 function logout(){sessionStorage.removeItem(SESSION);sessionStorage.removeItem('nms_login_remember_hint');location.reload()}
 function showLogin(){
  if(document.getElementById('v77Overlay'))return;
@@ -2094,17 +2100,18 @@ function login(){
 function renderUsers(){
  const box=document.getElementById('v77UserTable');if(!box)return;const me=current();
  if(!me||me.role!=='admin'){box.innerHTML='<div class="muted">Only Admin can manage users.</div>';return}
- let html='<table style="width:100%;border-collapse:collapse;min-width:1000px"><thead><tr><th>Name</th><th>Username / User ID</th><th>Role</th><th>Linked Student(s)</th><th>Initial Password</th><th>Actions</th></tr></thead><tbody>';
- users.forEach(x=>{const links=x.role==='student'?(x.studentId||'—'):(Array.isArray(x.childIds)&&x.childIds.length?x.childIds.join(', '):(x.guardianStudentId||'—'));html+='<tr><td>'+esc(x.name)+'</td><td><b>'+esc(x.username)+'</b></td><td>'+esc(rn[x.role]||x.role)+'</td><td>'+esc(links)+'</td><td>'+(x.initialPassword?'<code>'+esc(x.initialPassword)+'</code>':'••••••••')+'</td><td><button class="secondary v122-user-edit" type="button" data-user-id="'+esc(x.id)+'">✏️ Edit</button> <button class="danger v122-user-delete" type="button" data-user-id="'+esc(x.id)+'">🗑️ Delete</button></td></tr>'});
+ let html='<table style="width:100%;border-collapse:collapse;min-width:1000px"><thead><tr><th>Name</th><th>Username / User ID</th><th>Role</th><th>Linked Student(s)</th><th>Password (Admin Only)</th><th>Actions</th></tr></thead><tbody>';
+ users.forEach(x=>{const links=x.role==='student'?(x.studentId||'—'):(Array.isArray(x.childIds)&&x.childIds.length?x.childIds.join(', '):(x.guardianStudentId||'—'));html+='<tr><td>'+esc(x.name)+'</td><td><b>'+esc(x.username)+'</b></td><td>'+esc(rn[x.role]||x.role)+'</td><td>'+esc(links)+'</td><td><span class="v77-pw" data-pw="'+esc(x.password||x.initialPassword||'')+'">••••••••</span> <button class="secondary v77-show-pw" type="button" data-user-id="'+esc(x.id)+'">👁️</button></td><td><button class="secondary v122-user-edit" type="button" data-user-id="'+esc(x.id)+'">✏️ Edit</button> <button class="danger v122-user-delete" type="button" data-user-id="'+esc(x.id)+'">🗑️ Delete</button></td></tr>'});
  html+='</tbody></table><div class="v77-note" style="margin-top:10px">Student/Guardian credentials are generated automatically. Admin can reset them from Edit.</div>';box.innerHTML=html;
 }
 
 let editingId=null;
-function clearUser(){editingId=null;['v77Name','v77Username','v77Password'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});const r=document.getElementById('v77Role');if(r)r.value='teacher';const b=document.getElementById('v77SaveUser');if(b)b.textContent='💾 Save User'}
-function saveUser(){const name=document.getElementById('v77Name').value.trim(),username=document.getElementById('v77Username').value.trim(),password=document.getElementById('v77Password').value,role=document.getElementById('v77Role').value;if(!name||!username||!password){alert('Name, Username और Password भरें।');return}if(users.some(x=>x.username===username&&x.id!==editingId)){alert('यह username पहले से मौजूद है।');return}if(editingId){const x=users.find(x=>x.id===editingId);if(x){x.name=name;x.username=username;x.password=password;x.initialPassword=''}}else users.push({id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),name,username,password,role});persistUsers();clearUser();renderUsers();alert('User saved successfully.')}
-window.v77EditUser=id=>{const x=users.find(x=>x.id===id);if(!x)return;editingId=id;document.getElementById('v77Name').value=x.name;document.getElementById('v77Username').value=x.username;document.getElementById('v77Password').value='';document.getElementById('v77Role').value=x.role;document.getElementById('v77SaveUser').textContent='🔄 Update User';alert('Security ke liye existing password yahan blank hai. Naya password dalne par replace hoga.')};
+function clearUser(){editingId=null;['v77Name','v77Username','v77Password'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});const r=document.getElementById('v77Role');if(r)r.value='teacher';const pw=document.getElementById('v77Password');if(pw)pw.type='password';const b=document.getElementById('v77SaveUser');if(b)b.textContent='💾 Save User'}
+function saveUser(){const me=current();if(!me||me.role!=='admin'){alert('Only Admin can manage users.');return}const wasEditing=!!editingId;const name=document.getElementById('v77Name').value.trim(),username=document.getElementById('v77Username').value.trim(),password=document.getElementById('v77Password').value,role=document.getElementById('v77Role').value;if(!name||!username){alert('Name और Username भरें।');return}if(!editingId&&!password){alert('नए user के लिए password भरें।');return}if(users.some(x=>x.username===username&&x.id!==editingId)){alert('यह username पहले से मौजूद है।');return}if(editingId){const x=users.find(x=>x.id===editingId);if(!x)return;if(String(x.id)===String(me.id)&&role!=='admin'){alert('Admin ka role change nahi kiya ja sakta.');return}x.name=name;x.username=username;x.role=role;if(password){x.password=password;x.initialPassword=''}else if(!x.password&&x.initialPassword){x.password=x.initialPassword}if(String(x.id)===String(me.id)){const sess={...me,name:x.name,username:x.username,role:x.role};sessionStorage.setItem(SESSION,JSON.stringify(sess))}}else users.push({id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),name,username,password,role});persistUsers();clearUser();renderUsers();try{window.v123SyncNow?.()}catch(e){}alert(wasEditing?'User ID/Password updated successfully.':'User saved successfully.')}
+window.v77EditUser=id=>{const me=current();if(!me||me.role!=='admin'){alert('Only Admin can edit users.');return}const x=users.find(x=>String(x.id)===String(id));if(!x)return;editingId=x.id;document.getElementById('v77Name').value=x.name;document.getElementById('v77Username').value=x.username;document.getElementById('v77Password').value=x.password||x.initialPassword||'';document.getElementById('v77Password').type='password';document.getElementById('v77Role').value=x.role;document.getElementById('v77SaveUser').textContent='🔄 Update User'};
 window.v77DeleteUser=id=>{const me=current();if(me&&id===me.id){alert('Logged-in user को delete नहीं कर सकते।');return}if(!confirm('इस user को delete करें?'))return;users=users.filter(x=>x.id!==id);persistUsers();renderUsers()};
-document.addEventListener('click',e=>{const ed=e.target.closest&&e.target.closest('.v122-user-edit');if(ed){window.v77EditUser(ed.dataset.userId);return}const del=e.target.closest&&e.target.closest('.v122-user-delete');if(del)window.v77DeleteUser(del.dataset.userId)});
+document.addEventListener('click',e=>{const pw=e.target.closest&&e.target.closest('.v77-show-pw');if(pw){const x=users.find(x=>String(x.id)===String(pw.dataset.userId));if(x){const span=pw.parentElement.querySelector('.v77-pw');if(span){const shown=span.dataset.shown==='1';span.textContent=shown?'••••••••':(x.password||x.initialPassword||'');span.dataset.shown=shown?'0':'1';pw.textContent=shown?'👁️':'🙈'}}return}const ed=e.target.closest&&e.target.closest('.v122-user-edit');if(ed){window.v77EditUser(ed.dataset.userId);return}const del=e.target.closest&&e.target.closest('.v122-user-delete');if(del)window.v77DeleteUser(del.dataset.userId)});
+document.getElementById('v77TogglePassword')?.addEventListener('click',()=>{const p=document.getElementById('v77Password');if(p){p.type=p.type==='password'?'text':'password'}});
 function randomPassword(prefix){const a=new Uint32Array(4);if(window.crypto?.getRandomValues)crypto.getRandomValues(a);else for(let i=0;i<a.length;i++)a[i]=Math.floor(Math.random()*0xffffffff);return prefix+'@'+Array.from(a).map(n=>(n>>>0).toString(36)).join('').slice(0,8)+'9'}
 function uniqueUsername(base){let u=base,n=2;while(users.some(x=>x.username===u)){u=base+'_'+n++}return u}
 function guardianKey(student){return String(student.mobile||'').trim()+'|'+String(student.father||student.mother||'').trim().toLowerCase()}
@@ -3287,10 +3294,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function render(result,total){window.__v121BulkRows=result.valid;const wrap=byId('bulkPreviewWrap');if(wrap)wrap.style.display='block';const title=byId('bulkPreviewTitle');if(title)title.textContent='Preview: '+result.valid.length+' valid of '+total+' rows';const er=byId('bulkErrors');if(er)er.textContent=result.errors.length?result.errors.slice(0,30).join('\n')+(result.errors.length>30?'\n...and '+(result.errors.length-30)+' more':''):'No errors found.';const st=byId('bulkUploadStatus');if(st)st.textContent=total+' rows read — '+result.valid.length+' valid, '+result.errors.length+' rejected.';const h=byId('bulkPreviewHead');if(h)h.innerHTML='<tr><th>Admission</th><th>Name</th><th>Class</th><th>Gender</th><th>Father</th><th>Mother</th><th>Mobile</th><th>Samagra ID</th><th>Aadhaar</th><th>Address</th><th>Status</th></tr>';const b=byId('bulkPreviewBody');if(b)b.innerHTML=result.valid.slice(0,100).map(r=>'<tr><td>'+String(r.admissionNo)+'</td><td>'+String(r.name)+'</td><td>'+String(r.className)+'</td><td>'+String(r.gender||'—')+'</td><td>'+String(r.father||'—')+'</td><td>'+String(r.mother||'—')+'</td><td>'+String(r.mobile||'—')+'</td><td>'+String(r.samagra||'—')+'</td><td>'+String(r.aadhaar||'—')+'</td><td>'+String(r.address||'—')+'</td><td>Valid</td></tr>').join('')}
   async function handleFile(file){const st=byId('bulkUploadStatus');if(st)st.textContent='File read ho rahi hai...';try{const ext=file.name.toLowerCase().split('.').pop();const raw=ext==='csv'?parseCsv(await file.text()):await parseXlsx(file);if(!raw.length)throw Error('File me data rows nahi mili');render(validate(raw.map(mapRow)),raw.length)}catch(e){console.error('V121 Excel upload',e);if(st)st.textContent='File read nahi ho saki.';alert('Excel/CSV file read nahi ho saki.\n\n'+(e.message||e))}}
   function cancel(){window.__v121BulkRows=[];if(byId('bulkPreviewWrap'))byId('bulkPreviewWrap').style.display='none';if(byId('studentBulkFile'))byId('studentBulkFile').value='';}
-  function doImport(){const rows=window.__v121BulkRows||[];if(!rows.length){alert('Import karne ke liye valid students nahi hain.');return}if(!Array.isArray(students)){alert('Student data unavailable.');return}rows.forEach(r=>{const ns={id:typeof uid==='function'?uid():('stu_'+Date.now()+'_'+Math.random().toString(36).slice(2)),adm:r.admissionNo,name:r.name,cls:r.className,gender:r.gender,dob:r.dob,father:r.father,mother:r.mother,mobile:r.mobile,samagra:r.samagra,aadhaar:r.aadhaar,address:r.address,photo:''};students.push(ns)});let portalSetsCreated=0;try{if(typeof window.v77CreatePortalAccounts==='function'){const beforeUsers=JSON.parse(localStorage.getItem('nms_users_v77')||'[]').length;students.forEach(st=>window.v77CreatePortalAccounts(st,true));const afterUsers=JSON.parse(localStorage.getItem('nms_users_v77')||'[]').length;portalSetsCreated=Math.max(0,Math.floor((afterUsers-beforeUsers)/2));}}catch(e){console.warn('Portal account generation failed',e)}if(typeof save==='function')save();if(typeof renderStudents==='function')renderStudents();if(typeof renderClasses==='function')renderClasses();if(typeof updateDash==='function')updateDash();if(typeof window.v77RenderUsers==='function')window.v77RenderUsers();const st=byId('bulkUploadStatus');if(st)st.textContent=rows.length+' students successfully imported. Student/Guardian portal accounts checked automatically.';if(byId('bulkPreviewWrap'))byId('bulkPreviewWrap').style.display='none';if(byId('studentBulkFile'))byId('studentBulkFile').value='';window.__v121BulkRows=[];alert('Bulk student import complete.')}
+  function doImport(){if(!canStudentWrite()){alert('Bulk student update की अनुमति केवल Admin, Principal और Accountant को है।');return}const rows=window.__v121BulkRows||[];if(!rows.length){alert('Import karne ke liye valid students nahi hain.');return}if(!Array.isArray(students)){alert('Student data unavailable.');return}rows.forEach(r=>{const ns={id:typeof uid==='function'?uid():('stu_'+Date.now()+'_'+Math.random().toString(36).slice(2)),adm:r.admissionNo,name:r.name,cls:r.className,gender:r.gender,dob:r.dob,father:r.father,mother:r.mother,mobile:r.mobile,samagra:r.samagra,aadhaar:r.aadhaar,address:r.address,photo:''};students.push(ns)});let portalSetsCreated=0;try{if(typeof window.v77CreatePortalAccounts==='function'){const beforeUsers=JSON.parse(localStorage.getItem('nms_users_v77')||'[]').length;students.forEach(st=>window.v77CreatePortalAccounts(st,true));const afterUsers=JSON.parse(localStorage.getItem('nms_users_v77')||'[]').length;portalSetsCreated=Math.max(0,Math.floor((afterUsers-beforeUsers)/2));}}catch(e){console.warn('Portal account generation failed',e)}if(typeof save==='function')save();if(typeof renderStudents==='function')renderStudents();if(typeof renderClasses==='function')renderClasses();if(typeof updateDash==='function')updateDash();if(typeof window.v77RenderUsers==='function')window.v77RenderUsers();const st=byId('bulkUploadStatus');if(st)st.textContent=rows.length+' students successfully imported. Student/Guardian portal accounts checked automatically.';if(byId('bulkPreviewWrap'))byId('bulkPreviewWrap').style.display='none';if(byId('studentBulkFile'))byId('studentBulkFile').value='';window.__v121BulkRows=[];alert('Bulk student import complete.')}
   function downloadTemplate(){downloadBlob(new Blob([makeXlsx()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Nikhat_Middle_School_Student_Template.xlsx')}
   document.addEventListener('click',function(e){const d=e.target.closest&&e.target.closest('#downloadStudentTemplate,#bulkCancel,#bulkImport');if(!d)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(d.id==='downloadStudentTemplate')downloadTemplate();else if(d.id==='bulkCancel')cancel();else doImport()},true);
-  document.addEventListener('change',function(e){if(!e.target||e.target.id!=='studentBulkFile')return;e.stopPropagation();e.stopImmediatePropagation();const f=e.target.files&&e.target.files[0];if(f)handleFile(f)},true);
+  document.addEventListener('change',function(e){if(!e.target||e.target.id!=='studentBulkFile')return;if(!canStudentWrite()){e.target.value='';alert('Bulk student update की अनुमति केवल Admin, Principal और Accountant को है।');return;}e.stopPropagation();e.stopImmediatePropagation();const f=e.target.files&&e.target.files[0];if(f)handleFile(f)},true);
 })();
 </script>
 
@@ -3322,4 +3329,126 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+
+<script id="v145-cloud-first-login">
+/* V145 Cloud-First Device Bootstrap
+   - V143 code remains untouched; this layer only adds a new cloud-first path.
+   - NEVER place Supabase secret/service_role keys here.
+   - Set the two public values below once before deployment.
+*/
+(function(){
+  'use strict';
+  const EMBEDDED_URL='__SUPABASE_PROJECT_URL__';
+  const EMBEDDED_KEY='__SUPABASE_PUBLISHABLE_KEY__';
+  const CFG='nms_v80_cloud_config', USERS='nms_users_v77', SESSION='nms_login_v77';
+  const BOOT='nms_v145_cloud_bootstrap_done';
+  const SKIP_PREFIXES=['nms_v82_sync_','nms_v82_conflict','nms_v129_conflicts','nms_v131_'];
+  let client=null, booting=false;
+  function cfg(){
+    try{
+      const saved=JSON.parse(localStorage.getItem(CFG)||'{}');
+      const url=(saved.url||EMBEDDED_URL||'').trim().replace(/\/$/,'');
+      const key=(saved.key||EMBEDDED_KEY||'').trim();
+      return {url,key};
+    }catch(e){return {url:EMBEDDED_URL,key:EMBEDDED_KEY};}
+  }
+  function makeClient(){
+    if(!window.supabase)return null;
+    const c=cfg();
+    if(!c.url||c.url.indexOf('__SUPABASE_')===0||!c.key||c.key.indexOf('__SUPABASE_')===0)return null;
+    try{return window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}})}catch(e){return null}
+  }
+  function hasLocalCore(){
+    try{
+      const st=localStorage.getItem('nms_students'),te=localStorage.getItem('nms_teachers');
+      return !!((st&&st!=='[]')||(te&&te!=='[]'));
+    }catch(e){return false}
+  }
+  function setLocal(k,v){try{localStorage.setItem(k,typeof v==='string'?v:JSON.stringify(v));return true}catch(e){return false}}
+  function roleSession(authUser){
+    let users=[];try{users=JSON.parse(localStorage.getItem(USERS)||'[]')}catch(e){}
+    const email=String(authUser?.email||'').trim().toLowerCase();
+    const meta=authUser?.user_metadata||{};
+    const u=Array.isArray(users)?users.find(x=>{
+      const ce=String(x.cloudEmail||x.email||'').trim().toLowerCase();
+      const un=String(x.username||'').trim().toLowerCase();
+      return (ce&&ce===email)||(un&&un===email);
+    }):null;
+    const role=u?.role||meta.role||'teacher';
+    const sess={
+      id:u?.id||authUser.id,name:u?.name||meta.name||authUser.email||'User',
+      username:u?.username||authUser.email,role,
+      studentId:u?.studentId||'',guardianId:u?.guardianId||'',guardianStudentId:u?.guardianStudentId||'',
+      childIds:Array.isArray(u?.childIds)?u.childIds.slice():[]
+    };
+    sessionStorage.setItem(SESSION,JSON.stringify(sess));
+    return sess;
+  }
+  async function cloudRows(){
+    const r=await client.from('school_kv').select('key,value,updated_at').order('key');
+    if(r.error)throw r.error;
+    return r.data||[];
+  }
+  async function bootstrapCloud(){
+    if(booting)return false;booting=true;
+    try{
+      client=client||makeClient();
+      if(!client)return false;
+      const sr=await client.auth.getSession();
+      if(sr.error||!sr.data?.session)return false;
+      const rows=await cloudRows();
+      if(!rows.length)return false;
+      // New-device rule: cloud is authoritative for initial bootstrap.
+      for(const x of rows){
+        const k=String(x.key||'');
+        if(!k||k===CFG||k==='nms_sync_deleted')continue;
+        if(SKIP_PREFIXES.some(pre=>k.startsWith(pre)))continue;
+        setLocal(k,x.value);
+      }
+      const tomb=rows.find(x=>x.key==='nms_sync_deleted');
+      if(tomb)setLocal('nms_sync_deleted',tomb.value);
+      setLocal(CFG,JSON.stringify(cfg()));
+      setLocal(BOOT,'1');
+      roleSession(sr.data.session.user);
+      return true;
+    }catch(e){console.warn('V145 cloud bootstrap failed',e);return false}
+    finally{booting=false}
+  }
+  // School Login remains V143 local login. Admin first logs into Cloud from Central Database;
+  // once that Cloud session exists, this V145 layer bootstraps the new device from cloud.
+  const mo=new MutationObserver(()=>{});
+  function start(){
+    client=makeClient();
+    // Keep V143 role UI. Central Database remains hidden for non-admin users by the
+    // existing V145 safety layer; no school-login interception is performed here.
+    const hide=function(){
+      const sess=sessionStorage.getItem(SESSION);let u=null;try{u=JSON.parse(sess||'null')}catch(e){}
+      if(u&&u.role!=='admin'){
+        document.querySelectorAll('[data-page="centralDatabase"]').forEach(x=>x.style.display='none');
+        const page=document.getElementById('centralDatabase');if(page)page.style.display='none';
+      }
+    };
+    hide();
+    // If Admin has just completed Cloud Login, immediately bootstrap this device.
+    // Poll briefly because V143 Cloud Login is a separate UI action.
+    let tries=0;
+    const tick=async()=>{
+      tries++;
+      if(!client)return;
+      try{
+        const s=await client.auth.getSession();
+        if(s?.data?.session){
+          const ok=await bootstrapCloud();
+          if(ok){location.reload();return}
+        }
+      }catch(e){}
+      if(tries<20)setTimeout(tick,1000);
+    };
+    if(!hasLocalCore())setTimeout(tick,500);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+  window.nmsV145CloudBootstrap=bootstrapCloud;
+})();
+</script>
+
 </body></html>
