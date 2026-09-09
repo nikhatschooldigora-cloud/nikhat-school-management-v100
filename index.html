@@ -790,12 +790,12 @@ function freeLocalStorageForSync(){
   }catch(e){console.warn('Storage cleanup unavailable',e)}
 }
 function save(){
+  // Write only keys whose serialized value actually changed.  The previous
+  // save() wrote all five core keys on every operation, which made unrelated
+  // modules look dirty and created false sync conflicts.
   freeLocalStorageForSync();
-  localStorage.setItem('nms_students',JSON.stringify(students));
-  localStorage.setItem('nms_teachers',JSON.stringify(teachers));
-  localStorage.setItem('nms_fees',JSON.stringify(fees));
-  localStorage.setItem('nms_attendance',JSON.stringify(attendance));
-  localStorage.setItem('nms_marks',JSON.stringify(marks));
+  const pairs=[['nms_students',students],['nms_teachers',teachers],['nms_fees',fees],['nms_attendance',attendance],['nms_marks',marks]];
+  pairs.forEach(([k,v])=>{const next=JSON.stringify(v),prev=localStorage.getItem(k);if(prev!==next)localStorage.setItem(k,next)});
 }
 function restoreStudentsBackup(){try{const b=JSON.parse(localStorage.getItem('nms_students_backup')||'[]');if(Array.isArray(b)&&b.length){students=b;normalizeStudents();renderStudents();renderClasses();updateDash();return true}}catch(e){}return false}
 
@@ -2131,7 +2131,7 @@ if(!current())setTimeout(showLogin,0);
 })();
 </script>
 <script>
-/* V125 Supabase Cloud Database + Safe Mobile↔Cloud↔Laptop Auto Sync */
+/* V126 Supabase Cloud Database + Live All-Device Sync */
 (function(){
 const CFG='nms_v80_cloud_config', KEY_PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base', DIRTY='nms_v123_dirty_meta', DELETED='nms_sync_deleted';
 let syncApplying=false;
@@ -2194,6 +2194,16 @@ function getDeleted(){try{return JSON.parse(localStorage.getItem(DELETED)||'{}')
 function putDeleted(d){try{syncApplying=true;localStorage.setItem(DELETED,JSON.stringify(d||{}));}catch(e){}finally{syncApplying=false}}
 function markDeleted(k){if(!k||!k.startsWith(KEY_PREFIX)||k===CFG)return;const d=getDeleted();d[k]=Date.now();putDeleted(d)}
 function clearDeleted(k){const d=getDeleted();if(d[k]!==undefined){delete d[k];putDeleted(d)}}
+function pruneFalseDirty(){
+  try{
+    const d=getDirty(),b=getBase();let changed=false;
+    Object.keys(d).forEach(k=>{
+      const lv=readJson(k),bv=b[k];
+      if(bv!==undefined&&same(baseSafeClone(lv),bv)){delete d[k];changed=true;}
+    });
+    if(changed)putDirty(d);
+  }catch(e){console.warn('Dirty metadata cleanup skipped',e)}
+}
 
 function cloudKeys(){
   const out=[];
@@ -2221,8 +2231,10 @@ function baseSafeClone(v){
   return x;
 }
 function safeLocalSet(k,v){
+  const wasApplying=syncApplying; syncApplying=true;
   try{localStorage.setItem(k,v);return true}
   catch(e){freeLocalStorageForSync();try{localStorage.setItem(k,v);return true}catch(e2){console.warn('Sync storage write skipped',k,e2);return false}}
+  finally{syncApplying=wasApplying}
 }
 function getMeta(){try{return JSON.parse(localStorage.getItem(META)||'{}')}catch(e){return {}}}
 function getBase(){try{return JSON.parse(localStorage.getItem(BASE)||'{}')}catch(e){return {}}}
@@ -2247,11 +2259,11 @@ function recordSyncConflict(key,localValue,cloudValue){
   // contain photos and push the browser over its ~5MB quota. Keep only a small
   // diagnostic entry and de-duplicate repeated reports for the same key.
   try{
-    const storeKey='nms_v82_conflicts';
+    const storeKey='nms_v126_conflicts';
     const arr=JSON.parse(localStorage.getItem(storeKey)||'[]');
     const item={key:String(key),detectedAt:new Date().toISOString(),localSize:JSON.stringify(localValue??null).length,cloudSize:JSON.stringify(cloudValue??null).length};
-    const last=arr[arr.length-1];
-    if(last&&last.key===item.key&&Math.abs(Date.now()-new Date(last.detectedAt).getTime())<3600000)return;
+    const lastSame=[...arr].reverse().find(x=>x&&x.key===item.key);
+    if(lastSame&&Math.abs(Date.now()-new Date(lastSame.detectedAt).getTime())<3600000)return;
     arr.push(item);while(arr.length>20)arr.shift();
     safeLocalSet(storeKey,JSON.stringify(arr));
   }catch(e){console.warn('Conflict notice skipped',e)}
@@ -2260,7 +2272,7 @@ function recordSyncConflict(key,localValue,cloudValue){
 
 function renderSyncConflicts(){
   const el=document.getElementById('v122ConflictInfo');if(!el)return;
-  let arr=[];try{arr=JSON.parse(localStorage.getItem('nms_v82_conflicts')||'[]')}catch(e){}
+  let arr=[];try{arr=JSON.parse(localStorage.getItem('nms_v126_conflicts')||'[]')}catch(e){}
   if(!arr.length){el.innerHTML='<b>कोई saved conflict नहीं है.</b>';return}
   const rows=arr.slice().reverse().map((x,i)=>{
     const when=x.detectedAt?new Date(x.detectedAt).toLocaleString():'—';
@@ -2271,45 +2283,73 @@ function renderSyncConflicts(){
   el.innerHTML='<b>कुल saved conflicts: '+arr.length+'</b>'+rows;
 }
 
-function mergeRecords(base,local,cloud){
-  // Merge arrays by stable record id. For plain objects, merge changed fields.
-  // For primitive/unkeyed arrays, fall back to a de-duplicated union rather than
-  // creating a huge localStorage conflict payload.
+function mergeRecords(base,local,cloud,prefer='cloud'){
+  // Recursive three-way merge.  This is important for fees/attendance/marks,
+  // whose values contain nested objects.  V125 compared only the first level,
+  // so two harmless edits inside different nested fields could be reported as
+  // a conflict.  Same-field concurrent edits use the requested newer side.
   const ids=['id','_id','adm','admission','admissionNo','scholarNo','username','key'];
   const getId=o=>{if(!o||typeof o!=='object')return null;for(const k of ids)if(o[k]!==undefined&&o[k]!==null&&String(o[k])!=='')return k+'='+String(o[k]);return null};
-  if(Array.isArray(local)&&Array.isArray(cloud)){
-    const map=new Map(), order=[];
-    for(const item of cloud){const id=getId(item);if(id){map.set(id,clone(item));order.push(id)}else order.push(null)}
-    const baseMap=new Map(), localMap=new Map();
-    if(Array.isArray(base))for(const item of base){const id=getId(item);if(id)baseMap.set(id,item)}
-    for(const item of local){const id=getId(item);if(id)localMap.set(id,item)}
-    if(local.every(x=>getId(x)) && cloud.every(x=>getId(x))){
-      for(const [id,l] of localMap){
-        const c=map.get(id), b=baseMap.get(id);
-        if(!c){map.set(id,clone(l));continue}
-        if(!b){map.set(id,clone(l));continue}
-        const merged=clone(c), keys=new Set([...Object.keys(b||{}),...Object.keys(l||{}),...Object.keys(c||{})]);
-        for(const k of keys){const lv=l[k],bv=b[k],cv=c[k];const lc=!same(lv,bv),cc=!same(cv,bv);if(lc&&!cc)merged[k]=clone(lv);else if(lc&&cc&&same(lv,cv))merged[k]=clone(lv)}
-        map.set(id,merged)
+  const deep=(b,l,c)=>{
+    if(same(l,c))return {ok:true,value:clone(l)};
+    if(same(l,b))return {ok:true,value:clone(c)};
+    if(same(c,b))return {ok:true,value:clone(l)};
+    if(Array.isArray(l)&&Array.isArray(c)){
+      const allIds=l.every(x=>getId(x))&&c.every(x=>getId(x));
+      if(allIds){
+        const lm=new Map(l.map(x=>[getId(x),x])),cm=new Map(c.map(x=>[getId(x),x])),bm=new Map(Array.isArray(b)?b.filter(x=>getId(x)).map(x=>[getId(x),x]):[]);
+        const order=[]; c.forEach(x=>order.push(getId(x))); l.forEach(x=>{const id=getId(x);if(!order.includes(id))order.push(id)});
+        const out=[];
+        for(const id of order){const r=deep(bm.get(id),lm.get(id),cm.get(id));if(!r.ok)return {ok:false};out.push(r.value)}
+        return {ok:true,value:out};
       }
-      const result=[];
-      for(const item of cloud){const id=getId(item);if(id&&map.has(id))result.push(map.get(id))}
-      const cloudIds=new Set(order.filter(Boolean));
-      for(const item of local){const id=getId(item);if(id&&!cloudIds.has(id))result.push(clone(item))}
-      return result
+      // For unkeyed arrays, preserve the union of entries rather than dropping
+      // a record from either device.
+      const out=[],seen=new Set();
+      for(const x of [...c,...l]){let sig;try{sig=JSON.stringify(x)}catch(e){sig=String(x)}if(!seen.has(sig)){seen.add(sig);out.push(clone(x))}}
+      return {ok:true,value:out};
     }
-    // No stable IDs: preserve all distinct entries from both sides.
-    const result=[],seen=new Set();
-    for(const item of [...cloud,...local]){let sig;try{sig=JSON.stringify(item)}catch(e){sig=String(item)}if(!seen.has(sig)){seen.add(sig);result.push(clone(item))}}
-    return result;
-  }
-  if(base&&local&&cloud&&typeof base==='object'&&typeof local==='object'&&typeof cloud==='object'&&!Array.isArray(base)&&!Array.isArray(local)&&!Array.isArray(cloud)){
-    const merged=clone(cloud), keys=new Set([...Object.keys(base),...Object.keys(local),...Object.keys(cloud)]);
-    for(const k of keys){const lv=local[k],bv=base[k],cv=cloud[k];const lc=!same(lv,bv),cc=!same(cv,bv);if(lc&&!cc)merged[k]=clone(lv);else if(lc&&cc&&same(lv,cv))merged[k]=clone(lv)}
-    return merged
-  }
-  return null;
+    if(b&&l&&c&&typeof b==='object'&&typeof l==='object'&&typeof c==='object'&&!Array.isArray(b)&&!Array.isArray(l)&&!Array.isArray(c)){
+      const out=clone(c),keys=new Set([...Object.keys(b),...Object.keys(l),...Object.keys(c)]);
+      for(const k of keys){const r=deep(b[k],l[k],c[k]);if(!r.ok){out[k]=clone(prefer==='local'?l[k]:c[k]);continue}out[k]=r.value}
+      return {ok:true,value:out};
+    }
+    // Same scalar changed on both sides: retain the newer/preferred side.
+    return {ok:true,value:clone(prefer==='local'?l:c)};
+  };
+  const r=deep(base,local,cloud);return r.ok?r.value:null;
 }
+
+function applyCloudValueToMemory(k,value){
+  // localStorage is not enough: the app keeps core datasets in memory.  When
+  // cloud data arrives in the background, update those live variables too so
+  // the next edit cannot accidentally overwrite freshly synced cloud data.
+  try{
+    const v=typeof value==='string'?readMaybe(value):clone(value);
+    if(k==='nms_students'){students=Array.isArray(v)?v:[];if(typeof normalizeStudents==='function')normalizeStudents();}
+    else if(k==='nms_teachers'){teachers=Array.isArray(v)?v:[];}
+    else if(k==='nms_fees'){fees=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};}
+    else if(k==='nms_attendance'){attendance=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};}
+    else if(k==='nms_marks'){marks=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};}
+  }catch(e){console.warn('Memory sync update skipped',k,e)}
+}
+
+function refreshAfterCloudSync(changedKeys){
+  try{updateDash?.();}catch(e){}
+  try{renderStudents?.();}catch(e){}
+  try{renderClasses?.();}catch(e){}
+  try{renderTeachers?.();}catch(e){}
+  try{updateDashboardAttendance?.();}catch(e){}
+  try{renderAttendance?.();}catch(e){}
+  try{renderMonthlyAttendance?.();}catch(e){}
+  try{renderFees?.();}catch(e){}
+  try{updateFeeDashboard?.();}catch(e){}
+  try{renderFeeStudentLedger?.();}catch(e){}
+  try{renderExamRows?.();}catch(e){}
+  try{renderExamList?.();}catch(e){}
+  try{window.dispatchEvent(new CustomEvent('nms:cloudSyncUpdated',{detail:{keys:changedKeys||[]}}));}catch(e){}
+}
+
 
 async function pushKeyConflictSafe(k, localValue, force=false){
   const meta=getMeta(), base=getBase(), dirty=getDirty();
@@ -2398,6 +2438,7 @@ async function pullCloudSilently(reason){
       if(dt>Math.max(known,localDirty,rowTime)){
         syncApplying=true;
         try{if(localStorage.getItem(k)!==null)localStorage.removeItem(k)}finally{syncApplying=false}
+        applyCloudValueToMemory(k,null);
         delete dirty[k]; delete base[k]; meta[k]=dt; changed++;
       }
       if(row && dt>=rowTime){
@@ -2436,7 +2477,7 @@ async function pullCloudSilently(reason){
         if(localValue!==null&&oldBase!==undefined&&!same(localValue,oldBase)&&!same(localValue,cloudValue)){
           const merged=mergeRecords(oldBase,localValue,cloudValue);
           if(merged!==null){
-            if(safeLocalSet(r.key,JSON.stringify(merged))){base[r.key]=baseSafeClone(merged);meta[r.key]=cloudTime;changed++;}
+            if(safeLocalSet(r.key,JSON.stringify(merged))){applyCloudValueToMemory(r.key,merged);base[r.key]=baseSafeClone(merged);meta[r.key]=cloudTime;changed++;}
             const ts=Math.max(Date.now(),cloudTime+1);
             const up=await client.from('school_kv').upsert({key:r.key,value:clone(merged),updated_at:new Date(ts).toISOString()},{onConflict:'key'});
             if(up.error)throw up.error;
@@ -2445,7 +2486,7 @@ async function pullCloudSilently(reason){
             recordSyncConflict(r.key,localValue,cloudValue);conflicts++;continue;
           }
         }else{
-          if(safeLocalSet(r.key,typeof r.value==='string'?r.value:JSON.stringify(r.value))){base[r.key]=baseSafeClone(cloudValue);meta[r.key]=cloudTime;changed++;}
+          if(safeLocalSet(r.key,typeof r.value==='string'?r.value:JSON.stringify(r.value))){applyCloudValueToMemory(r.key,cloudValue);base[r.key]=baseSafeClone(cloudValue);meta[r.key]=cloudTime;changed++;}
           clearDirty(r.key);
         }
       }else if(localValueExists(r.key)&&base[r.key]===undefined){
@@ -2467,12 +2508,13 @@ async function pullCloudSilently(reason){
     }
 
     putMeta(meta);putBase(base);
+    if(changed)refreshAfterCloudSync([]);
     setStatus(true,'Connected + Logged in');
     autoSyncInfo('synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' local update(s) pushed':'')+(conflicts?' • '+conflicts+' conflict saved':'')+' • '+new Date().toLocaleTimeString());
     if((changed||pushed)&&reason==='startup')setStatus(true,'Connected + Logged in • Sync updated');
     return true;
   }catch(e){
-    console.warn('V125 auto sync:',e);
+    console.warn('V126 auto sync:',e);
     const msg=String(e?.message||e||'Unknown sync error').replace(/\s+/g,' ').trim();
     setStatus(true,'Connected + Logged in • Sync Error');
     autoSyncInfo('sync error • '+msg.slice(0,140));
@@ -2572,7 +2614,7 @@ function init(){
   document.getElementById('v80Upload')?.addEventListener('click',upload);
   document.getElementById('v80Download')?.addEventListener('click',download);
   document.getElementById('v122InitializeCloud')?.addEventListener('click',initializeCloudFromThisDevice);
-  initClient(false);installAutoUpload();setTimeout(()=>pullCloudSilently('startup'),900);
+  initClient(false);pruneFalseDirty();installAutoUpload();setTimeout(()=>pullCloudSilently('startup'),900);
   window.addEventListener('online',()=>scheduleAutoSync('online'));
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleAutoSync('visible')})
 }
