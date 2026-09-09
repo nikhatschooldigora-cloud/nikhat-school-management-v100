@@ -1455,18 +1455,19 @@ function printFeeReport(){const schoolLogo=getSchoolLogo();
 function deleteStudent(id){
  const s=students.find(x=>String(x?.id)===String(id)); if(!s)return;
  if(confirm(`क्या आप ${s.name} को delete करना चाहते हैं? / Delete this student?`)){
-   const sid=String(id);
+   const sid=String(id),now=Date.now();
    students=students.filter(x=>String(x?.id)!==sid);
    try{
      const d=JSON.parse(localStorage.getItem('nms_sync_deleted')||'{}')||{};
-     d['student:'+sid]={type:'student',id:sid,deletedAt:Date.now()};
+     d['student:'+sid]={type:'student',id:sid,adm:s?.adm||s?.admissionNo||'',name:s?.name||'',cls:s?.cls||'',mobile:s?.mobile||'',deletedAt:now};
      localStorage.setItem('nms_sync_deleted',JSON.stringify(d));
    }catch(e){console.warn('student delete tombstone failed',e)}
    save();updateDash();renderStudents();renderClasses();
+   setTimeout(()=>window.v123SyncNow?.(),0);
  }
 }
 function addTeacher(){if(savingTeacher)return;const name=document.getElementById('tName').value.trim();if(!name)return alert('कृपया शिक्षक का नाम भरें');const mobile=document.getElementById('tMobile').value.trim(),aadhaar=document.getElementById('tAadhaar').value.trim();if(mobile&&!/^\d{10}$/.test(mobile))return alert('Mobile number 10 digits का होना चाहिए');if(aadhaar&&!/^\d{12}$/.test(aadhaar))return alert('Aadhaar Number 12 digits का होना चाहिए');savingTeacher=true;document.getElementById('saveTeacherBtn').disabled=true;const empInput=document.getElementById('tEmpId').value.trim(),emp=empInput||'EMP'+String(teachers.length+1).padStart(3,'0');if(!editingTeacherId&&teachers.some(t=>String(t.empId).toLowerCase()===emp.toLowerCase())){savingTeacher=false;document.getElementById('saveTeacherBtn').disabled=false;return alert('यह Employee ID पहले से मौजूद है')}const data={empId:emp,name,role:document.getElementById('tRole').value.trim()||'Teacher',subject:document.getElementById('tSubject').value.trim(),gender:document.getElementById('tGender').value,dob:document.getElementById('tDob').value,joining:document.getElementById('tJoining').value,qualification:document.getElementById('tQualification').value.trim(),mobile,email:document.getElementById('tEmail').value.trim(),aadhaar,salary:document.getElementById('tSalary').value.trim(),address:document.getElementById('tAddress').value.trim(),photo:teacherPhotoData};if(editingTeacherId){const i=teachers.findIndex(t=>t.id===editingTeacherId);if(i>=0)teachers[i]={...teachers[i],...data}}else teachers.push({...data,id:'tea_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8)});save();closeModal();updateDash();renderTeachers();showPage('teachers');alert(editingTeacherId?'शिक्षक की जानकारी अपडेट हो गई':'शिक्षक सफलतापूर्वक सेव हो गया');savingTeacher=false;document.getElementById('saveTeacherBtn').disabled=false}
-function deleteTeacher(id){const t=teachers.find(x=>String(x?.id)===String(id));if(!t)return;if(confirm(`क्या आप ${t.name} को delete करना चाहते हैं? / Delete this teacher?`)){const tid=String(id);teachers=teachers.filter(x=>String(x?.id)!==tid);try{const d=JSON.parse(localStorage.getItem('nms_sync_deleted')||'{}')||{};d['teacher:'+tid]={type:'teacher',id:tid,deletedAt:Date.now()};localStorage.setItem('nms_sync_deleted',JSON.stringify(d))}catch(e){console.warn('teacher delete tombstone failed',e)}save();updateDash();renderTeachers()}}
+function deleteTeacher(id){const t=teachers.find(x=>String(x?.id)===String(id));if(!t)return;if(confirm(`क्या आप ${t.name} को delete करना चाहते हैं? / Delete this teacher?`)){const tid=String(id),now=Date.now();teachers=teachers.filter(x=>String(x?.id)!==tid);try{const d=JSON.parse(localStorage.getItem('nms_sync_deleted')||'{}')||{};d['teacher:'+tid]={type:'teacher',id:tid,empId:t?.empId||'',name:t?.name||'',mobile:t?.mobile||'',email:t?.email||'',deletedAt:now};localStorage.setItem('nms_sync_deleted',JSON.stringify(d))}catch(e){console.warn('teacher delete tombstone failed',e)}save();updateDash();renderTeachers();setTimeout(()=>window.v123SyncNow?.(),0)}}
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-action],[data-edit],[data-delete],[data-profile],[data-profile-performance],[data-profile-edit],[data-profile-print],[data-profile-close],[data-idcard],[data-dash],[data-teacher-profile],[data-teacher-profile-edit],[data-teacher-profile-print],[data-teacher-profile-close],[data-teacher-edit],[data-teacher-delete],[data-att-id],[data-fee-collect],[data-fee-set],[data-fee-receipt],[data-fee-delete]');
   if(!el)return;
@@ -2148,7 +2149,7 @@ if(!current())setTimeout(showLogin,0);
 })();
 </script>
 <script>
-/* V131 Single Safe All-Device Sync Engine */
+/* V143 Single Safe All-Device Sync Engine • robust deletion identity + manual sync */
 (function(){
 const CFG='nms_v80_cloud_config', PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base', DIRTY='nms_v131_dirty', APPLY='nms_v131_applying';
 let client=null,busy=false,timer=null,applying=false;
@@ -2206,12 +2207,24 @@ async function sync(reason){
   const tu=await client.from('school_kv').upsert({key:'nms_sync_deleted',value:tomb,updated_at:new Date().toISOString()},{onConflict:'key'});
   if(tu.error)throw tu.error;
 
-  const deletedStudents=new Set(Object.values(tomb).filter(x=>x&&x.type==='student'&&x.id!=null).map(x=>String(x.id)));
-  const deletedTeachers=new Set(Object.values(tomb).filter(x=>x&&x.type==='teacher'&&x.id!=null).map(x=>String(x.id)));
+  const deletedStudents=Object.values(tomb).filter(x=>x&&x.type==='student');
+  const deletedTeachers=Object.values(tomb).filter(x=>x&&x.type==='teacher');
+  const norm=v=>String(v??'').trim().toLowerCase();
+  const studentDeleted=x=>deletedStudents.some(d=>{
+    if(d.id!=null&&String(d.id)===String(x?.id))return true;
+    if(norm(d.adm)&&norm(d.adm)===norm(x?.adm||x?.admissionNo))return true;
+    return norm(d.name)&&norm(d.name)===norm(x?.name)&&norm(d.cls)===norm(x?.cls)&&norm(d.mobile)===norm(x?.mobile);
+  });
+  const teacherDeleted=x=>deletedTeachers.some(d=>{
+    if(d.id!=null&&String(d.id)===String(x?.id))return true;
+    if(norm(d.empId)&&norm(d.empId)===norm(x?.empId))return true;
+    if(norm(d.email)&&norm(d.email)===norm(x?.email))return true;
+    return norm(d.name)&&norm(d.name)===norm(x?.name)&&norm(d.mobile)===norm(x?.mobile);
+  });
   const keys=[...new Set([...cloud.keys(),...cloudKeys(),'nms_students','nms_teachers','nms_fees','nms_attendance','nms_marks'])];
   const changed=[]; let pushed=0;
-  const stripStudents=v=>Array.isArray(v)&&deletedStudents.size?v.filter(x=>!deletedStudents.has(String(x?.id))):v;
-  const stripTeachers=v=>Array.isArray(v)&&deletedTeachers.size?v.filter(x=>!deletedTeachers.has(String(x?.id))):v;
+  const stripStudents=v=>Array.isArray(v)?v.filter(x=>!studentDeleted(x)):v;
+  const stripTeachers=v=>Array.isArray(v)?v.filter(x=>!teacherDeleted(x)):v;
 
   for(const k of keys){
    if(k==='nms_sync_deleted')continue;
@@ -2270,9 +2283,9 @@ async function sync(reason){
   }
   if(changed.length)refresh(changed);
   status(true,'Connected + Logged in');
-  info('V142 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
+  info('V143 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
  }catch(e){
-  console.warn('V140 sync:',e); status(false,'Connected + Logged in • Sync Error');
+  console.warn('V143 sync:',e); status(false,'Connected + Logged in • Sync Error');
   info('sync error • '+String(e.message||e).slice(0,140));
  }finally{busy=false}
 }
@@ -2280,7 +2293,7 @@ function applyMemory(k,v){try{if(k==='nms_students'){students=Array.isArray(v)?v
 async function upload(){return sync('manual upload')}
 async function download(){try{await session();const r=await client.from('school_kv').select('key,value,updated_at').order('key');if(r.error)throw r.error;if(!r.data?.length)return alert('Cloud database खाली है.');if(!confirm('Cloud data को इस device में replace करना है?'))return;applying=true;try{for(const x of r.data){if(x.key===CFG)continue;localStorage.setItem(x.key,typeof x.value==='string'?x.value:JSON.stringify(x.value))}}finally{applying=false}location.reload()}catch(e){alert('Download failed: '+e.message)}}
 async function initializeCloud(){try{await session();const keys=cloudKeys();let n=0;for(const k of keys){const lv=read(k);if(lv!==null){const r=await client.from('school_kv').upsert({key:k,value:clone(lv),updated_at:new Date().toISOString()},{onConflict:'key'});if(r.error)throw r.error;n++}}status(true,'Cloud Initialized • '+n+' items');info('cloud initialized');alert('Cloud initialization हो गया: '+n+' items.')}catch(e){alert('Cloud initialization failed: '+e.message)}}
-function init(){applyConfigFromLink();const u=document.getElementById('v80Url'),k=document.getElementById('v80Key'),c=cfg();if(u)u.value=c.url||'';if(k)k.value=c.key||'';document.getElementById('v80Connect')?.addEventListener('click',saveCfg);document.getElementById('v80Login')?.addEventListener('click',login);document.getElementById('v80Logout')?.addEventListener('click',logout);document.getElementById('v80Upload')?.addEventListener('click',upload);document.getElementById('v80Download')?.addEventListener('click',download);document.getElementById('v122InitializeCloud')?.addEventListener('click',initializeCloud);document.getElementById('v134ShareSetup')?.addEventListener('click',shareCloudSetup);if(initClient())authInfo();setTimeout(()=>sync('startup'),900);window.addEventListener('online',()=>schedule('online'));document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule('visible')});setInterval(()=>{if(document.visibilityState==='visible'&&!busy)schedule('background')},10000)}
+function init(){applyConfigFromLink();const u=document.getElementById('v80Url'),k=document.getElementById('v80Key'),c=cfg();if(u)u.value=c.url||'';if(k)k.value=c.key||'';document.getElementById('v80Connect')?.addEventListener('click',saveCfg);document.getElementById('v80Login')?.addEventListener('click',login);document.getElementById('v80Logout')?.addEventListener('click',logout);document.getElementById('v80Upload')?.addEventListener('click',upload);document.getElementById('v80Download')?.addEventListener('click',download);document.getElementById('v122InitializeCloud')?.addEventListener('click',initializeCloud);document.getElementById('v134ShareSetup')?.addEventListener('click',shareCloudSetup);document.getElementById('v123SyncNow')?.addEventListener('click',()=>sync('manual button'));if(initClient())authInfo();setTimeout(()=>sync('startup'),900);window.addEventListener('online',()=>schedule('online'));document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule('visible')});setInterval(()=>{if(document.visibilityState==='visible'&&!busy)schedule('background')},10000)}
 // Track user-created local changes. A cloud-applied write is shielded by `applying`.
 (function patchStorage(){if(window.__v131StoragePatched)return;window.__v131StoragePatched=true;const os=Storage.prototype.setItem,or=Storage.prototype.removeItem;Storage.prototype.setItem=function(k,v){os.call(this,k,v);if(this===localStorage&&!applying&&k&&k.startsWith(PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict')&&!k.startsWith('nms_v129_conflicts')&&!k.startsWith('nms_v131_'))schedule('local change')};Storage.prototype.removeItem=function(k){or.call(this,k);if(this===localStorage&&!applying&&k&&k.startsWith(PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict')&&!k.startsWith('nms_v129_conflicts')&&!k.startsWith('nms_v131_'))schedule('local delete')}})();
 window.v80Upload=upload;window.v80Download=download;window.v80Test=testConnection;window.v123SyncNow=()=>sync('manual');window.v123RenderSyncConflicts=()=>{};
