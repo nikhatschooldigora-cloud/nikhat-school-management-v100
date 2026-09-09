@@ -2128,6 +2128,21 @@ function ensurePortalAccounts(student,quiet){
  persistUsers();renderUsers();
  return {student:{username:su.username,password:su.initialPassword||su.password},guardian:{username:gu.username,password:gu.initialPassword||gu.password},made};
 }
+function cleanupPortalUsers(activeStudents){
+ const active=new Set((Array.isArray(activeStudents)?activeStudents:[]).map(s=>String(s?.id||'')));
+ users=users.filter(u=>{
+  if(u.role==='student') return active.has(String(u.studentId||''));
+  if(u.role==='guardian'){
+   const ids=(Array.isArray(u.childIds)?u.childIds:[]).map(String).filter(id=>active.has(id));
+   if(!ids.length&&u.guardianStudentId&&active.has(String(u.guardianStudentId))) ids.push(String(u.guardianStudentId));
+   if(!ids.length) return false;
+   u.childIds=[...new Set(ids)]; u.guardianStudentId=u.childIds[0]||'';
+   return true;
+  }
+  return true;
+ });
+}
+window.v77CleanupPortalUsers=()=>cleanupPortalUsers(window.nmsGetStudentsV122?.()||[]);
 window.v77CreatePortalAccounts=ensurePortalAccounts;
 window.v122EnsureAllPortalAccounts=function(){if(!current()||current().role!=='admin'){alert('Only Admin can generate accounts.');return}const list=Array.isArray(window.nmsGetStudentsV122?.())?window.nmsGetStudentsV122():[];let created=0;list.forEach(s=>{const before=users.length;ensurePortalAccounts(s,true);if(users.length>before)created++});persistUsers();renderUsers();alert('Portal account check complete.\n\nStudents checked: '+list.length+'\nNew Student/Guardian account sets created: '+created);return created};
 window.v77RenderUsers=renderUsers;window.v77Logout=logout;window.v77ApplyPermissions=hideMenus;
@@ -2151,12 +2166,12 @@ function renderPortal(){
  if(u.role==='guardian'){ids=(Array.isArray(u.childIds)?u.childIds:[]).map(String);if(!ids.length&&u.guardianStudentId)ids=[String(u.guardianStudentId)];if(!ids.length&&u.guardianId)ids=[String(u.guardianId)]}
  const kids=list.filter(s=>ids.includes(String(s.id)));box.innerHTML=kids.length?kids.map(renderStudentCard).join(''):'<div class="muted">No linked student record found. Admin को Users & Permissions में account linkage check करना चाहिए.</div>';
 }
-document.addEventListener('DOMContentLoaded',()=>{const u=current();if(!u){showLogin();return}hideMenus();document.getElementById('v77SaveUser')?.addEventListener('click',saveUser);document.getElementById('v77ClearUser')?.addEventListener('click',clearUser);document.getElementById('v122GenerateAccounts')?.addEventListener('click',window.v122EnsureAllPortalAccounts);if(u.role==='admin'){try{const list=Array.isArray(window.nmsGetStudentsV122?.())?window.nmsGetStudentsV122():[];list.forEach(st=>ensurePortalAccounts(st,true));persistUsers()}catch(e){console.warn('Portal account migration',e)}}renderUsers();const top=document.querySelector('.top');if((u.role==='student'||u.role==='guardian')&&!document.querySelector('.nav button[data-page="'+(u.role==='student'?'studentPortal':'guardianPortal')+'"]')){const nav=document.querySelector('.nav');if(nav){const pb=document.createElement('button');pb.type='button';pb.dataset.page=u.role==='student'?'studentPortal':'guardianPortal';pb.textContent=u.role==='student'?'🎓 Student Portal':'👨‍👩‍👧 Guardian Portal';pb.onclick=()=>showPage(pb.dataset.page);nav.appendChild(pb)}}renderPortal();if(top&&!document.getElementById('v77UserBadge')){const b=document.createElement('span');b.id='v77UserBadge';b.style='margin-left:auto;font-size:12px;font-weight:700';b.textContent=u.name+' • '+(rn[u.role]||u.role);const lo=document.createElement('button');lo.type='button';lo.className='secondary';lo.textContent='🚪 Logout';lo.onclick=logout;top.appendChild(b);top.appendChild(lo)}});
+document.addEventListener('DOMContentLoaded',()=>{const u=current();if(!u){showLogin();return}hideMenus();document.getElementById('v77SaveUser')?.addEventListener('click',saveUser);document.getElementById('v77ClearUser')?.addEventListener('click',clearUser);document.getElementById('v122GenerateAccounts')?.addEventListener('click',window.v122EnsureAllPortalAccounts);if(u.role==='admin'){try{const list=Array.isArray(window.nmsGetStudentsV122?.())?window.nmsGetStudentsV122():[];cleanupPortalUsers(list);list.forEach(st=>ensurePortalAccounts(st,true));persistUsers()}catch(e){console.warn('Portal account migration',e)}}else{try{cleanupPortalUsers(Array.isArray(window.nmsGetStudentsV122?.())?window.nmsGetStudentsV122():[]);persistUsers()}catch(e){console.warn('Portal account cleanup',e)}}renderUsers();const top=document.querySelector('.top');if((u.role==='student'||u.role==='guardian')&&!document.querySelector('.nav button[data-page="'+(u.role==='student'?'studentPortal':'guardianPortal')+'"]')){const nav=document.querySelector('.nav');if(nav){const pb=document.createElement('button');pb.type='button';pb.dataset.page=u.role==='student'?'studentPortal':'guardianPortal';pb.textContent=u.role==='student'?'🎓 Student Portal':'👨‍👩‍👧 Guardian Portal';pb.onclick=()=>showPage(pb.dataset.page);nav.appendChild(pb)}}renderPortal();if(top&&!document.getElementById('v77UserBadge')){const b=document.createElement('span');b.id='v77UserBadge';b.style='margin-left:auto;font-size:12px;font-weight:700';b.textContent=u.name+' • '+(rn[u.role]||u.role);const lo=document.createElement('button');lo.type='button';lo.className='secondary';lo.textContent='🚪 Logout';lo.onclick=logout;top.appendChild(b);top.appendChild(lo)}});
 if(!current())setTimeout(showLogin,0);
 })();
 </script>
 <script>
-/* V143 Single Safe All-Device Sync Engine • robust deletion identity + manual sync */
+/* V146 Single Safe All-Device Sync Engine • robust deletion identity + manual sync */
 (function(){
 const CFG='nms_v80_cloud_config', PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base', DIRTY='nms_v131_dirty', APPLY='nms_v131_applying';
 let client=null,busy=false,timer=null,applying=false;
@@ -2184,7 +2199,7 @@ function merge(a,b){
  return clone(a);
 }
 function setLocal(k,v){applying=true;try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){try{if(typeof freeLocalStorageForSync==='function')freeLocalStorageForSync();localStorage.setItem(k,JSON.stringify(v));return true}catch(e2){console.warn('sync local write failed',k,e2);return false}}finally{applying=false}}
-function refresh(keys){try{updateDash?.();renderStudents?.();renderClasses?.();renderTeachers?.();renderAttendance?.();renderMonthlyAttendance?.();renderFees?.();updateFeeDashboard?.();renderFeeStudentLedger?.();renderExamRows?.();renderExamList?.();}catch(e){}try{window.dispatchEvent(new CustomEvent('nms:cloudSyncUpdated',{detail:{keys}}))}catch(e){}}
+function refresh(keys){try{updateDash?.();renderStudents?.();renderClasses?.();renderTeachers?.();renderAttendance?.();renderMonthlyAttendance?.();renderFees?.();updateFeeDashboard?.();renderFeeStudentLedger?.();renderExamRows?.();renderExamList?.();}catch(e){}try{window.v77RenderUsers?.()}catch(e){}try{window.dispatchEvent(new CustomEvent('nms:cloudSyncUpdated',{detail:{keys}}))}catch(e){}}
 function applyConfigFromLink(){try{const p=new URLSearchParams(location.search),token=p.get('nms_cloud');if(!token)return;let b=token.replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';const c=JSON.parse(decodeURIComponent(escape(atob(b))));if(c&&c.url&&c.key){localStorage.setItem(CFG,JSON.stringify({url:String(c.url).replace(/\/$/,''),key:String(c.key)}));history.replaceState({},document.title,location.pathname+location.hash)}}catch(e){console.warn('Cloud setup link ignored',e)}}
 function fallbackCopy(text){const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();try{document.execCommand('copy');alert('Mobile Cloud Setup Link copy हो गई। इसे WhatsApp पर भेजें.')}catch(e){alert('Link copy नहीं हो सकी. इसे manually share करें:\n'+text)}t.remove()}
 function shareCloudSetup(){try{const c=cfg();if(!c.url||!c.key)return alert('पहले Project URL और anon/publishable key save करें.');const token=btoa(unescape(encodeURIComponent(JSON.stringify(c)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');const link=location.origin+location.pathname+'?nms_cloud='+token;if(navigator.share){navigator.share({title:'Nikhat School Cloud Setup',url:link}).catch(()=>{})}else if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(link).then(()=>alert('Mobile Cloud Setup Link copy हो गई। इसे WhatsApp पर भेजें.')).catch(()=>fallbackCopy(link))}else fallbackCopy(link)}catch(e){alert('Setup link नहीं बन सकी: '+e.message)}}
@@ -2228,7 +2243,25 @@ async function sync(reason){
     if(norm(d.email)&&norm(d.email)===norm(x?.email))return true;
     return norm(d.name)&&norm(d.name)===norm(x?.name)&&norm(d.mobile)===norm(x?.mobile);
   });
-  const keys=[...new Set([...cloud.keys(),...cloudKeys(),'nms_students','nms_teachers','nms_fees','nms_attendance','nms_marks'])];
+  const sanitizeUsers=v=>{
+   if(!Array.isArray(v))return v;
+   const activeList=stripStudents(read('nms_students'));
+   const active=new Set((Array.isArray(activeList)?activeList:[]).map(s=>String(s?.id||'')));
+   return v.filter(u=>{
+    if(!u||typeof u!=='object')return true;
+    if(u.role==='student')return active.has(String(u.studentId||''));
+    if(u.role==='guardian'){
+     const ids=(Array.isArray(u.childIds)?u.childIds:[]).map(String).filter(id=>active.has(id));
+     if(!ids.length&&u.guardianStudentId&&active.has(String(u.guardianStudentId)))ids.push(String(u.guardianStudentId));
+     if(!ids.length)return false;
+     u.childIds=[...new Set(ids)];
+     u.guardianStudentId=u.childIds[0]||'';
+     return true;
+    }
+    return true;
+   });
+  };
+  const keys=[...new Set([...cloud.keys(),...cloudKeys(),'nms_students','nms_teachers','nms_users_v77','nms_fees','nms_attendance','nms_marks'])];
   const changed=[]; let pushed=0;
   const stripStudents=v=>Array.isArray(v)?v.filter(x=>!studentDeleted(x)):v;
   const stripTeachers=v=>Array.isArray(v)?v.filter(x=>!teacherDeleted(x)):v;
@@ -2254,6 +2287,13 @@ async function sync(reason){
     }
     lv=filteredLv; cv=filteredCv;
    }
+   else if(k==='nms_users_v77'){
+    const filteredLv=sanitizeUsers(lv), filteredCv=sanitizeUsers(cv);
+    if(!same(filteredLv,lv)){
+     if(setLocal(k,filteredLv)){changed.push(k)}
+    }
+    lv=filteredLv; cv=filteredCv;
+   }
    if(lv===null&&cr){
     if(setLocal(k,cv)){applyMemory(k,cv);changed.push(k)}
    }else if(lv!==null&&!cr){
@@ -2264,6 +2304,7 @@ async function sync(reason){
     let merged=merge(lv,cv);
     if(k==='nms_students')merged=stripStudents(merged);
     if(k==='nms_teachers')merged=stripTeachers(merged);
+    if(k==='nms_users_v77')merged=sanitizeUsers(merged);
     if(!same(merged,lv)){if(setLocal(k,merged)){applyMemory(k,merged);changed.push(k)}}
     if(!same(merged,cv)){
      const u=await client.from('school_kv').upsert({key:k,value:clone(merged),updated_at:new Date().toISOString()},{onConflict:'key'});
@@ -2272,6 +2313,15 @@ async function sync(reason){
    }
   }
 
+  const finalUsers=sanitizeUsers(read('nms_users_v77'));
+  if(Array.isArray(finalUsers)){
+   const cu=cloud.get('nms_users_v77'), cloudUsers=cu?sanitizeUsers(cu.value):null;
+   if(!same(finalUsers,cloudUsers)){
+    const u=await client.from('school_kv').upsert({key:'nms_users_v77',value:clone(finalUsers),updated_at:new Date().toISOString()},{onConflict:'key'});
+    if(u.error)throw u.error;pushed++;
+   }
+   if(!same(finalUsers,read('nms_users_v77'))){if(setLocal('nms_users_v77',finalUsers))changed.push('nms_users_v77')}
+  }
   const finalStudents=stripStudents(read('nms_students'));
   if(Array.isArray(finalStudents)){
    const cs=cloud.get('nms_students'), cloudStudents=cs?stripStudents(cs.value):null;
@@ -2290,9 +2340,9 @@ async function sync(reason){
   }
   if(changed.length)refresh(changed);
   status(true,'Connected + Logged in');
-  info('V143 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
+  info('V146 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
  }catch(e){
-  console.warn('V143 sync:',e); status(false,'Connected + Logged in • Sync Error');
+  console.warn('V146 sync:',e); status(false,'Connected + Logged in • Sync Error');
   info('sync error • '+String(e.message||e).slice(0,140));
  }finally{busy=false}
 }
@@ -3332,7 +3382,7 @@ if ('serviceWorker' in navigator) {
 
 <script id="v145-cloud-first-login">
 /* V145 Cloud-First Device Bootstrap
-   - V143 code remains untouched; this layer only adds a new cloud-first path.
+   - V145 code remains untouched; this layer only adds the Users & Permissions cleanup path.
    - NEVER place Supabase secret/service_role keys here.
    - Set the two public values below once before deployment.
 */
@@ -3414,12 +3464,12 @@ if ('serviceWorker' in navigator) {
     }catch(e){console.warn('V145 cloud bootstrap failed',e);return false}
     finally{booting=false}
   }
-  // School Login remains V143 local login. Admin first logs into Cloud from Central Database;
+  // School Login remains V145 local login. Admin first logs into Cloud from Central Database;
   // once that Cloud session exists, this V145 layer bootstraps the new device from cloud.
   const mo=new MutationObserver(()=>{});
   function start(){
     client=makeClient();
-    // Keep V143 role UI. Central Database remains hidden for non-admin users by the
+    // Keep V145 role UI. Central Database remains hidden for non-admin users by the
     // existing V145 safety layer; no school-login interception is performed here.
     const hide=function(){
       const sess=sessionStorage.getItem(SESSION);let u=null;try{u=JSON.parse(sess||'null')}catch(e){}
@@ -3430,7 +3480,7 @@ if ('serviceWorker' in navigator) {
     };
     hide();
     // If Admin has just completed Cloud Login, immediately bootstrap this device.
-    // Poll briefly because V143 Cloud Login is a separate UI action.
+    // Poll briefly because V145 Cloud Login is a separate UI action.
     let tries=0;
     const tick=async()=>{
       tries++;
