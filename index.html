@@ -1466,7 +1466,7 @@ function deleteStudent(id){
  }
 }
 function addTeacher(){if(savingTeacher)return;const name=document.getElementById('tName').value.trim();if(!name)return alert('कृपया शिक्षक का नाम भरें');const mobile=document.getElementById('tMobile').value.trim(),aadhaar=document.getElementById('tAadhaar').value.trim();if(mobile&&!/^\d{10}$/.test(mobile))return alert('Mobile number 10 digits का होना चाहिए');if(aadhaar&&!/^\d{12}$/.test(aadhaar))return alert('Aadhaar Number 12 digits का होना चाहिए');savingTeacher=true;document.getElementById('saveTeacherBtn').disabled=true;const empInput=document.getElementById('tEmpId').value.trim(),emp=empInput||'EMP'+String(teachers.length+1).padStart(3,'0');if(!editingTeacherId&&teachers.some(t=>String(t.empId).toLowerCase()===emp.toLowerCase())){savingTeacher=false;document.getElementById('saveTeacherBtn').disabled=false;return alert('यह Employee ID पहले से मौजूद है')}const data={empId:emp,name,role:document.getElementById('tRole').value.trim()||'Teacher',subject:document.getElementById('tSubject').value.trim(),gender:document.getElementById('tGender').value,dob:document.getElementById('tDob').value,joining:document.getElementById('tJoining').value,qualification:document.getElementById('tQualification').value.trim(),mobile,email:document.getElementById('tEmail').value.trim(),aadhaar,salary:document.getElementById('tSalary').value.trim(),address:document.getElementById('tAddress').value.trim(),photo:teacherPhotoData};if(editingTeacherId){const i=teachers.findIndex(t=>t.id===editingTeacherId);if(i>=0)teachers[i]={...teachers[i],...data}}else teachers.push({...data,id:'tea_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8)});save();closeModal();updateDash();renderTeachers();showPage('teachers');alert(editingTeacherId?'शिक्षक की जानकारी अपडेट हो गई':'शिक्षक सफलतापूर्वक सेव हो गया');savingTeacher=false;document.getElementById('saveTeacherBtn').disabled=false}
-function deleteTeacher(id){const t=teachers.find(x=>x.id===id);if(!t)return;if(confirm(`क्या आप ${t.name} को delete करना चाहते हैं? / Delete this teacher?`)){teachers=teachers.filter(x=>x.id!==id);save();updateDash();renderTeachers()}}
+function deleteTeacher(id){const t=teachers.find(x=>String(x?.id)===String(id));if(!t)return;if(confirm(`क्या आप ${t.name} को delete करना चाहते हैं? / Delete this teacher?`)){const tid=String(id);teachers=teachers.filter(x=>String(x?.id)!==tid);try{const d=JSON.parse(localStorage.getItem('nms_sync_deleted')||'{}')||{};d['teacher:'+tid]={type:'teacher',id:tid,deletedAt:Date.now()};localStorage.setItem('nms_sync_deleted',JSON.stringify(d))}catch(e){console.warn('teacher delete tombstone failed',e)}save();updateDash();renderTeachers()}}
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-action],[data-edit],[data-delete],[data-profile],[data-profile-performance],[data-profile-edit],[data-profile-print],[data-profile-close],[data-idcard],[data-dash],[data-teacher-profile],[data-teacher-profile-edit],[data-teacher-profile-print],[data-teacher-profile-close],[data-teacher-edit],[data-teacher-delete],[data-att-id],[data-fee-collect],[data-fee-set],[data-fee-receipt],[data-fee-delete]');
   if(!el)return;
@@ -2207,23 +2207,43 @@ async function sync(reason){
   if(tu.error)throw tu.error;
 
   const deletedStudents=new Set(Object.values(tomb).filter(x=>x&&x.type==='student'&&x.id!=null).map(x=>String(x.id)));
+  const deletedTeachers=new Set(Object.values(tomb).filter(x=>x&&x.type==='teacher'&&x.id!=null).map(x=>String(x.id)));
   const keys=[...new Set([...cloud.keys(),...cloudKeys(),'nms_students','nms_teachers','nms_fees','nms_attendance','nms_marks'])];
   const changed=[]; let pushed=0;
   const stripStudents=v=>Array.isArray(v)&&deletedStudents.size?v.filter(x=>!deletedStudents.has(String(x?.id))):v;
+  const stripTeachers=v=>Array.isArray(v)&&deletedTeachers.size?v.filter(x=>!deletedTeachers.has(String(x?.id))):v;
 
   for(const k of keys){
    if(k==='nms_sync_deleted')continue;
-   const cr=cloud.get(k); let lv=read(k), cv=cr?cr.value:null;
-   if(k==='nms_students'){lv=stripStudents(lv);cv=stripStudents(cv)}
+   const cr=cloud.get(k);
+   const originalLv=read(k);
+   let lv=originalLv, cv=cr?cr.value:null;
+   // V140: apply cloud tombstones to the existing device immediately.
+   // V138 filtered lv before comparison, so the remote device never wrote the
+   // filtered list to localStorage/memory and its UI kept showing the deleted student.
+   if(k==='nms_students'){
+    const filteredLv=stripStudents(lv), filteredCv=stripStudents(cv);
+    if(!same(filteredLv,lv)){
+     if(setLocal(k,filteredLv)){applyMemory(k,filteredLv);changed.push(k)}
+    }
+    lv=filteredLv; cv=filteredCv;
+   }else if(k==='nms_teachers'){
+    const filteredLv=stripTeachers(lv), filteredCv=stripTeachers(cv);
+    if(!same(filteredLv,lv)){
+     if(setLocal(k,filteredLv)){applyMemory(k,filteredLv);changed.push(k)}
+    }
+    lv=filteredLv; cv=filteredCv;
+   }
    if(lv===null&&cr){
     if(setLocal(k,cv)){applyMemory(k,cv);changed.push(k)}
    }else if(lv!==null&&!cr){
-    const clean=k==='nms_students'?stripStudents(lv):lv;
+    const clean=k==='nms_students'?stripStudents(lv):(k==='nms_teachers'?stripTeachers(lv):lv);
     const u=await client.from('school_kv').upsert({key:k,value:clone(clean),updated_at:new Date().toISOString()},{onConflict:'key'});
     if(u.error)throw u.error;pushed++;
    }else if(lv!==null&&cr){
     let merged=merge(lv,cv);
     if(k==='nms_students')merged=stripStudents(merged);
+    if(k==='nms_teachers')merged=stripTeachers(merged);
     if(!same(merged,lv)){if(setLocal(k,merged)){applyMemory(k,merged);changed.push(k)}}
     if(!same(merged,cv)){
      const u=await client.from('school_kv').upsert({key:k,value:clone(merged),updated_at:new Date().toISOString()},{onConflict:'key'});
@@ -2240,11 +2260,19 @@ async function sync(reason){
     if(u.error)throw u.error;pushed++;
    }
   }
+  const finalTeachers=stripTeachers(read('nms_teachers'));
+  if(Array.isArray(finalTeachers)){
+   const ct=cloud.get('nms_teachers'), cloudTeachers=ct?stripTeachers(ct.value):null;
+   if(!same(finalTeachers,cloudTeachers)){
+    const u=await client.from('school_kv').upsert({key:'nms_teachers',value:clone(finalTeachers),updated_at:new Date().toISOString()},{onConflict:'key'});
+    if(u.error)throw u.error;pushed++;
+   }
+  }
   if(changed.length)refresh(changed);
   status(true,'Connected + Logged in');
-  info('V138 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
+  info('V142 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
  }catch(e){
-  console.warn('V138 sync:',e); status(false,'Connected + Logged in • Sync Error');
+  console.warn('V140 sync:',e); status(false,'Connected + Logged in • Sync Error');
   info('sync error • '+String(e.message||e).slice(0,140));
  }finally{busy=false}
 }
