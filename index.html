@@ -181,6 +181,9 @@ button,input,select{font:inherit}button{cursor:pointer;border:0}
 .v122-portal-badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:#eef2ff;color:#1e3a8a;font-size:11px;font-weight:700}.v122-profile-head{display:flex;gap:16px;align-items:center;padding:14px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc}.v122-profile-head img,.v122-avatar{width:82px;height:96px;border-radius:10px;object-fit:cover;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:38px}.v122-profile-head h3{margin:0 0 6px}.v122-profile-head p{margin:3px 0;color:#64748b;font-size:12px}.v122-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}.v122-summary>div{padding:12px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;text-align:center}.v122-summary b{display:block;font-size:19px}.v122-summary small{color:#64748b}.v122-portal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.v122-portal-card{border:1px solid #e2e8f0;border-radius:11px;padding:13px;background:#fff}.v122-portal-card h4{margin:0 0 9px}.v122-item,.v122-stat{padding:8px 0;border-bottom:1px solid #edf0f5;font-size:12px}.v122-item:last-child,.v122-stat:last-child{border-bottom:0}.v122-item span,.v122-stat span{display:block;color:#64748b;font-size:11px;margin-top:3px}.v122-item p{margin:5px 0 0;white-space:pre-wrap}@media(max-width:700px){.v122-summary{grid-template-columns:repeat(2,1fr)}.v122-portal-grid{grid-template-columns:1fr}.v122-profile-head{align-items:flex-start}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+if(document.readyState!=='loading'){} else {}
+</script>
 
 <link rel="manifest" href="https://nikhatschooldigora-cloud.github.io/nikhat-school-management-v100/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="https://nikhatschooldigora-cloud.github.io/nikhat-school-management-v100/icon-192.png">
@@ -370,6 +373,12 @@ button,input,select{font:inherit}button{cursor:pointer;border:0}
 <div class="v78-card" style="grid-column:1/-1"><b>1. Supabase Connection</b><p class="muted">Supabase Project URL और <b>anon / publishable key</b> डालें. <b>Service Role key कभी न डालें.</b></p><label>Project URL<input id="v80Url" style="width:100%;padding:10px;border:1px solid #d8dce5;border-radius:8px" placeholder="https://xxxxxxxx.supabase.co"></label><label style="display:block;margin-top:8px">Anon / Publishable Key<input id="v80Key" type="password" style="width:100%;padding:10px;border:1px solid #d8dce5;border-radius:8px" placeholder="eyJ..."></label><div style="margin-top:8px"><button class="primary" id="v80Connect" type="button">🔗 Connect & Test</button></div></div>
 <div class="v78-card"><b>2. Cloud Login</b><p class="muted">Cloud database access के लिए Supabase Auth email/password इस्तेमाल होगा.</p><label>Email<input id="v80Email" type="email" autocomplete="username" placeholder="school@example.com"></label><label style="display:block;margin-top:8px">Password<input id="v80Password" type="password" autocomplete="current-password" placeholder="Password"></label><div style="margin-top:8px"><button class="primary" id="v80Login" type="button">🔐 Cloud Login</button> <button class="secondary" id="v80Logout" type="button">🚪 Logout</button></div><div id="v80AuthInfo" class="muted" style="margin-top:8px;font-size:12px"></div></div>
 <div class="v78-card"><b>3. Data Sync</b><p class="muted">V81 में Cloud Login के बाद data <b>automatic sync</b> होगा. Internet न होने पर local data चलता रहेगा और connection वापस आने पर sync फिर कोशिश करेगा.</p><button class="secondary" id="v80Download" type="button">⬇️ Download Cloud Data (Manual)</button> <button class="secondary" id="v80Upload" type="button">⬆️ Upload This Device (Manual)</button> <button class="secondary" id="v122InitializeCloud" type="button">🛡️ Initialize Cloud from This Device</button><div id="v81AutoSyncInfo" class="muted" style="margin-top:8px;font-weight:700">🔄 Auto Sync: checking...</div></div>
+<div class="v78-card" style="grid-column:1/-1">
+<b>3A. Sync Conflicts / Sync अंतर</b>
+<p class="muted">यहाँ केवल conflict की छोटी diagnostic जानकारी दिखाई जाती है। किसी भी data को अपने-आप overwrite नहीं किया जाएगा। पहले backup लेकर ही आगे का निर्णय होगा।</p>
+<div id="v122ConflictInfo" style="font-size:12px;line-height:1.7">Checking conflicts...</div>
+<button class="primary" id="v123SyncNow" type="button">🔄 Sync Now</button> <button class="secondary" id="v122RefreshConflicts" type="button">🔎 Refresh Conflict List</button>
+</div>
 <div class="v78-card"><b>4. Status</b><p class="muted">Cloud connection और login की स्थिति.</p><div id="v80Info" style="font-size:12px;line-height:1.6"><b>App Login:</b> Active on this device.<br><b>Cloud Database:</b> Not configured yet.<br><b>Mode:</b> Local / Offline</div></div>
 <div class="v78-card" style="grid-column:1/-1">
 <b>5. Cloud Safety & Recovery / क्लाउड सुरक्षा एवं रिकवरी</b>
@@ -2122,9 +2131,10 @@ if(!current())setTimeout(showLogin,0);
 })();
 </script>
 <script>
-/* V82 Supabase Cloud Database + Conflict-Safe Multi-device Auto Sync */
+/* V125 Supabase Cloud Database + Safe Mobile↔Cloud↔Laptop Auto Sync */
 (function(){
-const CFG='nms_v80_cloud_config', KEY_PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base';
+const CFG='nms_v80_cloud_config', KEY_PREFIX='nms_', META='nms_v82_sync_meta', BASE='nms_v82_sync_base', DIRTY='nms_v123_dirty_meta', DELETED='nms_sync_deleted';
+let syncApplying=false;
 freeLocalStorageForSync();
 let client=null, syncBusy=false, autoTimer=null;
 
@@ -2180,10 +2190,21 @@ async function cloudLogin(){
   }catch(e){alert('Cloud Login failed: '+e.message)}
 }
 async function cloudLogout(){if(!client)return;await client.auth.signOut();authInfo();setStatus(true,'Connected — Logged out');autoSyncInfo('login required')}
+function getDeleted(){try{return JSON.parse(localStorage.getItem(DELETED)||'{}')}catch(e){return {}}}
+function putDeleted(d){try{syncApplying=true;localStorage.setItem(DELETED,JSON.stringify(d||{}));}catch(e){}finally{syncApplying=false}}
+function markDeleted(k){if(!k||!k.startsWith(KEY_PREFIX)||k===CFG)return;const d=getDeleted();d[k]=Date.now();putDeleted(d)}
+function clearDeleted(k){const d=getDeleted();if(d[k]!==undefined){delete d[k];putDeleted(d)}}
+
 function cloudKeys(){
-  const out=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);
-    if(k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v8')&&!k.startsWith('nms_v7')&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflicts'))out.push(k)
-  }return out
+  const out=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith(KEY_PREFIX)||k===CFG)continue;
+    if(k.startsWith('nms_v82_sync_')||k.startsWith('nms_v82_conflict')||k.startsWith('nms_v123_')||k===DELETED)continue;
+    if(k==='nms_students_backup'||k==='nms_full_autobackup'||k==='nms_remember_login_v77')continue;
+    out.push(k);
+  }
+  return out;
 }
 function readJson(k){
   const raw=localStorage.getItem(k);if(raw===null)return null;
@@ -2205,6 +2226,10 @@ function safeLocalSet(k,v){
 }
 function getMeta(){try{return JSON.parse(localStorage.getItem(META)||'{}')}catch(e){return {}}}
 function getBase(){try{return JSON.parse(localStorage.getItem(BASE)||'{}')}catch(e){return {}}}
+function getDirty(){try{return JSON.parse(localStorage.getItem(DIRTY)||'{}')}catch(e){return {}}}
+function putDirty(d){try{safeLocalSet(DIRTY,JSON.stringify(d||{}))}catch(e){}}
+function markDirty(k){if(!k||!k.startsWith(KEY_PREFIX)||k===CFG)return;const d=getDirty();d[k]=Date.now();putDirty(d)}
+function clearDirty(k){const d=getDirty();if(d[k]!==undefined){delete d[k];putDirty(d)}}
 function putMeta(m){
   try{localStorage.setItem(META,JSON.stringify(m))}
   catch(e){console.warn('Sync meta storage unavailable',e);freeLocalStorageForSync();try{localStorage.setItem(META,JSON.stringify(m))}catch(e2){console.warn('Sync meta still unavailable',e2)}}
@@ -2230,6 +2255,20 @@ function recordSyncConflict(key,localValue,cloudValue){
     arr.push(item);while(arr.length>20)arr.shift();
     safeLocalSet(storeKey,JSON.stringify(arr));
   }catch(e){console.warn('Conflict notice skipped',e)}
+}
+
+
+function renderSyncConflicts(){
+  const el=document.getElementById('v122ConflictInfo');if(!el)return;
+  let arr=[];try{arr=JSON.parse(localStorage.getItem('nms_v82_conflicts')||'[]')}catch(e){}
+  if(!arr.length){el.innerHTML='<b>कोई saved conflict नहीं है.</b>';return}
+  const rows=arr.slice().reverse().map((x,i)=>{
+    const when=x.detectedAt?new Date(x.detectedAt).toLocaleString():'—';
+    const key=esc(String(x.key||'unknown'));
+    const ls=Number(x.localSize||0),cs=Number(x.cloudSize||0);
+    return '<div style="padding:8px 0;border-bottom:1px solid #e5e7eb"><b>#'+(arr.length-i)+' — '+key+'</b><br>समय: '+esc(when)+'<br>Local size: '+ls.toLocaleString()+' bytes • Cloud size: '+cs.toLocaleString()+' bytes</div>'
+  }).join('');
+  el.innerHTML='<b>कुल saved conflicts: '+arr.length+'</b>'+rows;
 }
 
 function mergeRecords(base,local,cloud){
@@ -2273,74 +2312,174 @@ function mergeRecords(base,local,cloud){
 }
 
 async function pushKeyConflictSafe(k, localValue, force=false){
-  const meta=getMeta(), base=getBase();
+  const meta=getMeta(), base=getBase(), dirty=getDirty();
   const {data,error}=await client.from('school_kv').select('key,value,updated_at').eq('key',k).maybeSingle();
   if(error)throw error;
   const cloudTime=data?.updated_at?new Date(data.updated_at).getTime():0;
-  const known=Number(meta[k]||0);
+  const known=Number(meta[k]||0), dirtyTime=Number(dirty[k]||0);
+
+  // V124: a local deletion is a real change and must delete the cloud row,
+  // but only when the deletion is newer than the known cloud version.
+  if(localValue===null){
+    if(data && (force || dirtyTime>=cloudTime)){
+      const {error:delErr}=await client.from('school_kv').delete().eq('key',k);
+      if(delErr)throw delErr;
+      delete meta[k];delete base[k];clearDirty(k);putMeta(meta);putBase(base);return true;
+    }
+    if(!data){delete meta[k];delete base[k];clearDirty(k);putMeta(meta);putBase(base);return true}
+    return false;
+  }
+
   if(!force && data && cloudTime>known){
+    if(dirtyTime && dirtyTime>cloudTime){
+      const ts=Math.max(Date.now(),dirtyTime+1);
+      const {error:upErr}=await client.from('school_kv').upsert({key:k,value:clone(localValue),updated_at:new Date(ts).toISOString()},{onConflict:'key'});
+      if(upErr)throw upErr;
+      meta[k]=ts;base[k]=baseSafeClone(localValue);clearDirty(k);clearDeleted(k);putMeta(meta);putBase(base);return true;
+    }
     const cloudValue=typeof data.value==='string'?readMaybe(data.value):data.value;
     const merged=mergeRecords(base[k],localValue,cloudValue);
     if(merged!==null){
-      localStorage.setItem(k,JSON.stringify(merged));
+      safeLocalSet(k,JSON.stringify(merged));
       localValue=merged;
     }else{
       recordSyncConflict(k,localValue,cloudValue);
       autoSyncInfo('conflict saved: '+k.replace(/^nms_/,''));
-      return false
+      return false;
     }
   }
-  const ts=Date.now();
+  const ts=Math.max(Date.now(),cloudTime+1);
   const {error:upErr}=await client.from('school_kv').upsert({key:k,value:clone(localValue),updated_at:new Date(ts).toISOString()},{onConflict:'key'});
   if(upErr)throw upErr;
-  meta[k]=ts;base[k]=baseSafeClone(localValue);putMeta(meta);putBase(base);return true
+  meta[k]=ts;base[k]=baseSafeClone(localValue);clearDirty(k);putMeta(meta);putBase(base);return true;
 }
+
 function readMaybe(v){try{return JSON.parse(v)}catch(e){return v}}
 
 async function pullCloudSilently(reason){
-  if(syncBusy)return false;syncBusy=true;
+  if(syncBusy)return false;
+  syncBusy=true;
   try{
     if(!client&&!initClient(false)){autoSyncInfo('not configured');return false}
-    const {data:sessionData,error:sessionError}=await client.auth.getSession();if(sessionError)throw sessionError;
+    const {data:sessionData,error:sessionError}=await client.auth.getSession();
+    if(sessionError)throw sessionError;
     if(!sessionData.session){autoSyncInfo('login required');return false}
-    const {data,error}=await client.from('school_kv').select('key,value,updated_at').order('key');if(error)throw error;
-    if(!data?.length){setStatus(true,'Connected + Logged in');autoSyncInfo('cloud empty • initialize required');return false}
-    const meta=getMeta(),base=getBase();let changed=0, conflicts=0;
-    for(const r of data){
-      const cloudTime=new Date(r.updated_at||0).getTime(), known=Number(meta[r.key]||0);
-      if(cloudTime>known){
-        const cloudValue=typeof r.value==='string'?readMaybe(r.value):r.value, localValue=readJson(r.key);
-        const oldBase=base[r.key];
-        if(localValue!==null&&!same(localValue,oldBase)&&!same(localValue,cloudValue)){
-          const merged=mergeRecords(oldBase,localValue,cloudValue);
-          if(merged!==null){
-            localStorage.setItem(r.key,JSON.stringify(merged));base[r.key]=baseSafeClone(merged);meta[r.key]=cloudTime;changed++;
-            await client.from('school_kv').upsert({key:r.key,value:clone(merged),updated_at:new Date().toISOString()},{onConflict:'key'});
-          }else{
-            recordSyncConflict(r.key,localValue,cloudValue);
-            conflicts++;continue
-          }
-        }else{
-          localStorage.setItem(r.key,typeof r.value==='string'?r.value:JSON.stringify(r.value));base[r.key]=baseSafeClone(cloudValue);meta[r.key]=cloudTime;changed++;
-        }
-      }else if(localValueExists(r.key)&&base[r.key]===undefined){
-        base[r.key]=baseSafeClone(readJson(r.key))
+    const {data,error}=await client.from('school_kv').select('key,value,updated_at').order('key');
+    if(error)throw error;
+    const rows=data||[];
+    const cloudMap=new Map(rows.map(r=>[r.key,r]));
+    const meta=getMeta(),base=getBase(),dirty=getDirty();
+    const deleted=getDeleted();
+    let changed=0,conflicts=0,pushed=0;
+
+    // V125: propagate deletions through a small cloud tombstone map.
+    // A record timestamp newer than its tombstone always wins, so recreating a
+    // deleted record does not get erased on the next device.
+    const cloudDeletedRow=cloudMap.get(DELETED);
+    let cloudDeleted={};
+    if(cloudDeletedRow){try{cloudDeleted=typeof cloudDeletedRow.value==='string'?JSON.parse(cloudDeletedRow.value):cloudDeletedRow.value||{}}catch(e){cloudDeleted={}}}
+    const mergedDeleted={...cloudDeleted};
+    Object.keys(deleted).forEach(k=>{if(Number(deleted[k]||0)>Number(mergedDeleted[k]||0))mergedDeleted[k]=Number(deleted[k])});
+
+    // Remove stale tombstones when the cloud record was recreated later.
+    for(const k of Object.keys(mergedDeleted)){
+      const dt=Number(mergedDeleted[k]||0), row=cloudMap.get(k), rowTime=row?new Date(row.updated_at||0).getTime():0;
+      if(row && rowTime>dt && Number(deleted[k]||0)<=rowTime){
+        delete mergedDeleted[k];
+        clearDeleted(k);
       }
     }
+
+    // Apply only tombstones that are newer than the last known/local edit.
+    // If a matching cloud row is newer, keep the row.
+    for(const k of Object.keys(mergedDeleted)){
+      const dt=Number(mergedDeleted[k]||0), known=Number(meta[k]||0), localDirty=Number(dirty[k]||0);
+      const row=cloudMap.get(k), rowTime=row?new Date(row.updated_at||0).getTime():0;
+      if(dt>Math.max(known,localDirty,rowTime)){
+        syncApplying=true;
+        try{if(localStorage.getItem(k)!==null)localStorage.removeItem(k)}finally{syncApplying=false}
+        delete dirty[k]; delete base[k]; meta[k]=dt; changed++;
+      }
+      if(row && dt>=rowTime){
+        const del=await client.from('school_kv').delete().eq('key',k);
+        if(del.error)throw del.error;
+        pushed++;
+      }
+    }
+
+    const tombChanged=JSON.stringify(mergedDeleted)!==JSON.stringify(cloudDeleted);
+    if(tombChanged){
+      const vals=Object.values(mergedDeleted).map(Number).filter(Number.isFinite);
+      const ts=Math.max(Date.now(),...vals,0)+1;
+      const up=await client.from('school_kv').upsert({key:DELETED,value:mergedDeleted,updated_at:new Date(ts).toISOString()},{onConflict:'key'});
+      if(up.error)throw up.error;
+      pushed++;
+    }
+    putDirty(dirty);putMeta(meta);putBase(base);
+    if(tombChanged){ cloudMap.set(DELETED,{key:DELETED,value:mergedDeleted,updated_at:new Date().toISOString()}); }
+
+    // First reconcile every cloud record with this device.
+    for(const r of rows){
+      if(r.key===DELETED)continue;
+      const cloudTime=new Date(r.updated_at||0).getTime();
+      const known=Number(meta[r.key]||0);
+      const dirtyTime=Number(dirty[r.key]||0);
+      const localValue=readJson(r.key);
+      const cloudValue=typeof r.value==='string'?readMaybe(r.value):r.value;
+
+      if(dirtyTime && dirtyTime>cloudTime){
+        try{if(await pushKeyConflictSafe(r.key,localValue))pushed++;}catch(e){console.warn('push newer local',r.key,e)}
+        continue;
+      }
+      if(cloudTime>known){
+        const oldBase=base[r.key];
+        if(localValue!==null&&oldBase!==undefined&&!same(localValue,oldBase)&&!same(localValue,cloudValue)){
+          const merged=mergeRecords(oldBase,localValue,cloudValue);
+          if(merged!==null){
+            if(safeLocalSet(r.key,JSON.stringify(merged))){base[r.key]=baseSafeClone(merged);meta[r.key]=cloudTime;changed++;}
+            const ts=Math.max(Date.now(),cloudTime+1);
+            const up=await client.from('school_kv').upsert({key:r.key,value:clone(merged),updated_at:new Date(ts).toISOString()},{onConflict:'key'});
+            if(up.error)throw up.error;
+            meta[r.key]=ts;base[r.key]=baseSafeClone(merged);clearDirty(r.key);pushed++;
+          }else{
+            recordSyncConflict(r.key,localValue,cloudValue);conflicts++;continue;
+          }
+        }else{
+          if(safeLocalSet(r.key,typeof r.value==='string'?r.value:JSON.stringify(r.value))){base[r.key]=baseSafeClone(cloudValue);meta[r.key]=cloudTime;changed++;}
+          clearDirty(r.key);
+        }
+      }else if(localValueExists(r.key)&&base[r.key]===undefined){
+        base[r.key]=baseSafeClone(localValue);
+      }
+    }
+
+    // Critical V124 fix: also scan LOCAL keys. This catches data created on
+    // a device that has never existed in Cloud yet (e.g. a new mobile student).
+    // V123 only iterated Cloud rows, so local-only records could remain on mobile.
+    for(const k of cloudKeys()){
+      if(cloudMap.has(k))continue;
+      const localValue=readJson(k);
+      const dirtyTime=Number(dirty[k]||0);
+      if(localValue===null)continue;
+      try{
+        if(await pushKeyConflictSafe(k,localValue))pushed++;
+      }catch(e){console.warn('push local-only key',k,e)}
+    }
+
     putMeta(meta);putBase(base);
     setStatus(true,'Connected + Logged in');
-    autoSyncInfo('synced '+data.length+' cloud items'+(conflicts?' • '+conflicts+' conflict saved':'')+' • '+new Date().toLocaleTimeString());
-    if(changed&&reason==='startup'){ setStatus(true,'Connected + Logged in • Sync updated'); }
-    return true
+    autoSyncInfo('synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' local update(s) pushed':'')+(conflicts?' • '+conflicts+' conflict saved':'')+' • '+new Date().toLocaleTimeString());
+    if((changed||pushed)&&reason==='startup')setStatus(true,'Connected + Logged in • Sync updated');
+    return true;
   }catch(e){
-    console.warn('V122 auto sync:',e);
+    console.warn('V125 auto sync:',e);
     const msg=String(e?.message||e||'Unknown sync error').replace(/\s+/g,' ').trim();
     setStatus(true,'Connected + Logged in • Sync Error');
     autoSyncInfo('sync error • '+msg.slice(0,140));
-    return false
-  }
-  finally{syncBusy=false}
+    return false;
+  }finally{syncBusy=false}
 }
+
 function localValueExists(k){return localStorage.getItem(k)!==null}
 function scheduleAutoSync(reason){
   clearTimeout(autoTimer);
@@ -2399,37 +2538,31 @@ async function download(){
     if(!data?.length){alert('Cloud database खाली है. पहले सही data वाले device से Upload करें.');return}
     if(!confirm('Cloud data download करने से इस device का मौजूदा nms_ data replace होगा. आगे बढ़ें?'))return;
     const meta={},base={};
-    data.forEach(r=>{const v=typeof r.value==='string'?r.value:JSON.stringify(r.value);localStorage.setItem(r.key,v);const parsed=readJson(r.key);base[r.key]=clone(parsed);meta[r.key]=new Date(r.updated_at||Date.now()).getTime()});
+    syncApplying=true;try{data.forEach(r=>{if(r.key===DELETED)return;const v=typeof r.value==='string'?r.value:JSON.stringify(r.value);localStorage.setItem(r.key,v);const parsed=readJson(r.key);base[r.key]=clone(parsed);meta[r.key]=new Date(r.updated_at||Date.now()).getTime()})}finally{syncApplying=false}
     putMeta(meta);putBase(base);setStatus(true,'Downloaded '+data.length+' data items');alert('Cloud data download हो गया. App अब reload होगा.');location.reload()
   }catch(e){alert('Download failed: '+e.message)}finally{syncBusy=false}
 }
 function installAutoUpload(){
-  if(window.__v82CloudPatched)return;window.__v82CloudPatched=true;
+  if(window.__v123CloudPatched)return;
+  window.__v123CloudPatched=true;
   const origSet=Storage.prototype.setItem,origRemove=Storage.prototype.removeItem;
   Storage.prototype.setItem=function(k,v){
-    const before=this===localStorage?readJson(k):null;origSet.call(this,k,v);
-    if(this===localStorage&&k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict_')&&!k.startsWith('nms_v82_conflicts')){
-      if(!syncBusy&&client){
-        client.auth.getSession().then(({data})=>{
-          if(data.session){
-            const meta=getMeta(),base=getBase();
-            if(base[k]===undefined)base[k]=baseSafeClone(before);
-            putBase(base);
-            pushKeyConflictSafe(k,readJson(k)).then(ok=>{if(ok)autoSyncInfo('saved • '+new Date().toLocaleTimeString())}).catch(()=>autoSyncInfo('waiting for internet'))
-          }
-        }).catch(()=>{})
-      }
+    const before=this===localStorage?readJson(k):null;
+    origSet.call(this,k,v);
+    if(this===localStorage&&!syncApplying&&k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict_')&&!k.startsWith('nms_v123_')){
+      markDirty(k);clearDeleted(k);
+      scheduleAutoSync('local change');
     }
   };
   Storage.prototype.removeItem=function(k){
     origRemove.call(this,k);
-    if(this===localStorage&&k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict_')&&!syncBusy&&client){
-      client.auth.getSession().then(({data})=>{
-        if(data.session)client.from('school_kv').delete().eq('key',k).then(()=>{const m=getMeta(),b=getBase();delete m[k];delete b[k];putMeta(m);putBase(b)}).catch(()=>{})
-      }).catch(()=>{})
+    if(this===localStorage&&!syncApplying&&k&&k.startsWith(KEY_PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict_')&&!k.startsWith('nms_v123_')){
+      markDirty(k);markDeleted(k);
+      scheduleAutoSync('local delete');
     }
-  }
+  };
 }
+
 function init(){
   const c=cfg(),u=document.getElementById('v80Url'),k=document.getElementById('v80Key');
   if(u)u.value=c.url||'';if(k)k.value=c.key||'';
@@ -2444,7 +2577,19 @@ function init(){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleAutoSync('visible')})
 }
 window.v80Upload=upload;window.v80Download=download;window.v80Test=testConnection;
+window.v123SyncNow=()=>pullCloudSilently('manual');
+window.v123RenderSyncConflicts=renderSyncConflicts;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+<script>
+(function(){
+  function ready(){
+    document.getElementById('v123SyncNow')?.addEventListener('click',()=>window.v123SyncNow&&window.v123SyncNow());
+    document.getElementById('v122RefreshConflicts')?.addEventListener('click',()=>window.v123RenderSyncConflicts&&window.v123RenderSyncConflicts());
+    if(window.v123RenderSyncConflicts)window.v123RenderSyncConflicts();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready);else ready();
 })();
 </script>
 
