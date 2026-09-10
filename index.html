@@ -2066,7 +2066,7 @@ const defaults=[
 {id:'u_teacher',name:'Teacher',username:'teacher',password:'teacher123',role:'teacher'},
 {id:'u_accountant',name:'Accountant',username:'accountant',password:'accountant123',role:'accountant'},
 {id:'u_office',name:'Office Staff',username:'office',password:'office123',role:'office'}];
-const perms={admin:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','backup','exams','notices','userManagement','centralDatabase','systemHealth'],principal:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],teacher:['dashboard','students','attendance','timetable','homework','exams','communication','parentContacts','notices'],accountant:['dashboard','students','fees','reports','communication','parentContacts'],office:['dashboard','students','idcards','staffIdCards','certificates','communication','parentContacts','notices','reports'],student:['studentPortal'],guardian:['guardianPortal']};
+const perms={admin:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','backup','exams','notices','userManagement','centralDatabase','systemHealth'],principal:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],teacher:['dashboard','students','attendance','timetable','homework','exams','communication','parentContacts','notices'],accountant:['dashboard','students','fees','reports','communication','parentContacts'],office:['dashboard','students','idcards','staffIdCards','certificates','communication','parentContacts','notices','reports'],student:['dashboard','studentPortal'],guardian:['guardianPortal']};
 const rn={admin:'Admin',principal:'Principal',teacher:'Teacher',accountant:'Accountant',office:'Office Staff',student:'Student',guardian:'Guardian'};
 let users=[];try{users=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){users=null}
 if(!Array.isArray(users)||!users.length){users=defaults;localStorage.setItem(KEY,JSON.stringify(users))}
@@ -3519,4 +3519,62 @@ if ('serviceWorker' in navigator) {
 })();
 </script>
 
+
+<style id="v156-role-permission-safe">
+.v156-hidden{display:none!important}.v156-disabled{pointer-events:none!important;opacity:.6!important}
+#students.v156-restricted #studentRows td:nth-child(1),#students.v156-restricted #studentRows td:nth-child(2),#students.v156-restricted #studentRows td:nth-child(4),#students.v156-restricted #studentRows td:nth-child(6),#students.v156-restricted #studentRows td:nth-child(7),#students.v156-restricted #studentRows td:nth-child(8),#students.v156-restricted #studentRows td:nth-child(9),#students.v156-restricted #studentRows td:nth-child(10),#students.v156-restricted #studentRows td:nth-child(11),#students.v156-restricted #studentRows td:nth-child(12),#students.v156-restricted table thead th:nth-child(1),#students.v156-restricted table thead th:nth-child(2),#students.v156-restricted table thead th:nth-child(4),#students.v156-restricted table thead th:nth-child(6),#students.v156-restricted table thead th:nth-child(7),#students.v156-restricted table thead th:nth-child(8),#students.v156-restricted table thead th:nth-child(9),#students.v156-restricted table thead th:nth-child(10),#students.v156-restricted table thead th:nth-child(11),#students.v156-restricted table thead th:nth-child(12){display:none!important}
+#students.v156-restricted #studentRows .nameBtn,#students.v156-restricted #studentRows button{pointer-events:none!important;cursor:default!important}
+</style>
+<script>
+(function(){
+'use strict';
+const PRIV=['admin','principal','accountant'];
+function role(){try{const x=JSON.parse(sessionStorage.getItem('nms_login_v77')||'null');return String(x?.role||'').toLowerCase()}catch(e){return ''}}
+function privileged(){return PRIV.includes(role())}
+function hide(e){if(e)e.classList.add('v156-hidden')}
+function disable(e){if(e){e.disabled=true;e.classList.add('v156-disabled');e.setAttribute('aria-disabled','true')}}
+function applyLogo(){if(privileged())return;['schoolLogoFile','saveSchoolLogo','removeSchoolLogo'].forEach(id=>hide(document.getElementById(id)))}
+function applyDashboard(){if(privileged())return;document.querySelectorAll('[data-nms-fee="open"]').forEach(hide);hide(document.querySelector('#dashboard .dashCard[data-dash="fees"]'));['feeDue','dashCollected','dashPendingFees','dashFeePaid','dashFeeDue'].forEach(id=>{const e=document.getElementById(id);if(e)hide(e.closest('.card,.dash-mini,.snapshot-card'))});document.querySelectorAll('#dashboard .dash-summary .dash-mini').forEach(e=>{if(/Fee Collected|Fee Due Students/i.test(e.textContent||''))hide(e)});document.querySelectorAll('#dashboard .dash-snapshot-grid .snapshot-card').forEach(e=>{if(/^\s*Fees\b/i.test(e.textContent||''))hide(e)});if(role()==='student')document.querySelectorAll('#dashboard [data-action="openStudent"]').forEach(hide)}
+function applyStudents(){const restricted=!!role()&&!privileged(),page=document.getElementById('students');if(!page)return;page.classList.toggle('v156-restricted',restricted);if(privileged())return;document.querySelectorAll('#students [data-action="openStudent"],#students #bulkStudentPanel').forEach(hide);const search=document.getElementById('search');if(search){search.value='';search.disabled=true;search.placeholder='Name / Father / Mother';}document.querySelectorAll('#studentRows .edit,#studentRows .del,#studentRows .view,#studentRows [data-idcard],#studentRows [data-profile]').forEach(disable)}
+function applyTimetable(){if(privileged())return;['v73Period','v73Start','v73End','v73Subject','v73Teacher','v73Room'].forEach(id=>disable(document.getElementById(id)));['v73Save','v73Clear','v73Print','v73ClearClass','v98TTTeacherPrint','v98TTExport'].forEach(id=>disable(document.getElementById(id)));const tv=document.getElementById('v98TTTeacher');if(tv)tv.disabled=false}
+function applyParent(){if(privileged())return;['v76FatherMobile','v76MotherMobile','v76GuardianMobile','v76Emergency'].forEach(id=>{const e=document.getElementById(id);if(e){e.value='';hide(e.closest('label')||e)}});disable(document.getElementById('v76Save'));['v76Print','v76Export'].forEach(id=>disable(document.getElementById(id)));document.querySelectorAll('#v76Table button').forEach(disable)}
+function applyFees(){if(privileged())return;['topCollectFeeBtn','v87FeeBulkPanel','v88FeeStructurePanel','v89FeeDashboard'].forEach(id=>hide(document.getElementById(id)));document.querySelectorAll('#fees .payBtn,#fees .receiptBtn').forEach(disable)}
+function apply(){applyLogo();applyDashboard();applyStudents();applyTimetable();applyParent();applyFees()}
+function init(){apply();setTimeout(apply,250);setTimeout(apply,800)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});
+window.v156ApplyRolePermissions=apply;
+})();
+</script>
+
+<style id="v157-contact-privacy">
+/* V157: Teacher login contact privacy */
+body.v157-teacher-contact-privacy #students #studentRows td:nth-child(7),
+body.v157-teacher-contact-privacy #students table thead th:nth-child(7),
+body.v157-teacher-contact-privacy #parentContacts #v76Table td:nth-child(4),
+body.v157-teacher-contact-privacy #parentContacts #v76Table td:nth-child(5),
+body.v157-teacher-contact-privacy #parentContacts #v76Table td:nth-child(6),
+body.v157-teacher-contact-privacy #parentContacts #v76Table td:nth-child(7),
+body.v157-teacher-contact-privacy #parentContacts #v76Table th:nth-child(4),
+body.v157-teacher-contact-privacy #parentContacts #v76Table th:nth-child(5),
+body.v157-teacher-contact-privacy #parentContacts #v76Table th:nth-child(6),
+body.v157-teacher-contact-privacy #parentContacts #v76Table th:nth-child(7){display:none!important}
+</style>
+<script id="v157-contact-privacy-script">
+(function(){
+'use strict';
+function r(){try{const u=JSON.parse(sessionStorage.getItem('nms_login_v77')||'null');return String(u?.role||'').toLowerCase()}catch(e){return ''}}
+function apply(){
+  const isTeacher=r()==='teacher';
+  document.body.classList.toggle('v157-teacher-contact-privacy',isTeacher);
+  if(isTeacher){
+    document.querySelectorAll('#students #studentRows td:nth-child(7),#parentContacts #v76Table td:nth-child(n+4):nth-child(-n+7)').forEach(e=>e.textContent='Hidden / छिपा हुआ');
+  }
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply);else apply();
+setTimeout(apply,300);setTimeout(apply,1000);
+setInterval(apply,1000);
+window.v157ApplyContactPrivacy=apply;
+})();
+</script>
 </body></html>
