@@ -2078,7 +2078,7 @@ function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function persistUsers(){localStorage.setItem(KEY,JSON.stringify(users))}
 function current(){try{const raw=sessionStorage.getItem(SESSION);return raw?JSON.parse(raw):null}catch(e){return null}}
 function allowed(p){const u=current();return !!u&&(perms[u.role]||[]).includes(p)}
-function canStudentWrite(){const u=current();return !!u&&['admin','principal','accountant'].includes(u.role)}
+function canStudentWrite(){const u=current();const r=String(u?.role||'').toLowerCase();return ['admin','principal','accountant','officeassistant'].includes(r)}
 function applyStudentWriteAccess(){const can=canStudentWrite();document.querySelectorAll('#bulkStudentPanel,[data-student-write],#studentActions').forEach(e=>{if(e)e.style.display=can?'':'none'});document.querySelectorAll('[data-action="openStudent"]').forEach(e=>{e.style.display=can?'':'none'});document.querySelectorAll('#studentRows .edit,#studentRows .del').forEach(e=>{e.style.display=can?'':'none'});}
 
 function hideMenus(){const u=current();document.querySelectorAll('.nav button[data-page]').forEach(b=>{b.style.display=(u&&(perms[u.role]||[]).includes(b.dataset.page))?'':'none'});const badge=document.getElementById('v77UserBadge');if(badge)badge.textContent=u?(u.name+' • '+(rn[u.role]||u.role)):'';applyStudentWriteAccess()}
@@ -3394,7 +3394,22 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js', {scope: './'}).then(function(reg){try{reg.update()}catch(e){}}).catch(function () {});
+    // V164: one-time PWA cache reset. School data/localStorage is untouched.
+    (async function(){
+      const marker='nms_v165_cache_reset_done';
+      try {
+        if (!sessionStorage.getItem(marker)) {
+          sessionStorage.setItem(marker,'1');
+          const regs=await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r=>r.unregister().catch(()=>false)));
+          const keys=await caches.keys();
+          await Promise.all(keys.map(k=>caches.delete(k).catch(()=>false)));
+          location.reload();
+          return;
+        }
+      } catch(e) {}
+      navigator.serviceWorker.register('./sw.js?v=164',{scope:'./'}).then(function(reg){try{reg.update()}catch(e){}}).catch(function(){});
+    })();
   });
 }
 </script>
@@ -3536,7 +3551,7 @@ function hide(e){if(e)e.classList.add('v156-hidden')}
 function disable(e){if(e){e.disabled=true;e.classList.add('v156-disabled');e.setAttribute('aria-disabled','true')}}
 function applyLogo(){if(privileged())return;['schoolLogoFile','saveSchoolLogo','removeSchoolLogo'].forEach(id=>hide(document.getElementById(id)))}
 function applyDashboard(){if(privileged())return;document.querySelectorAll('[data-nms-fee="open"]').forEach(hide);hide(document.querySelector('#dashboard .dashCard[data-dash="fees"]'));['feeDue','dashCollected','dashPendingFees','dashFeePaid','dashFeeDue'].forEach(id=>{const e=document.getElementById(id);if(e)hide(e.closest('.card,.dash-mini,.snapshot-card'))});document.querySelectorAll('#dashboard .dash-summary .dash-mini').forEach(e=>{if(/Fee Collected|Fee Due Students/i.test(e.textContent||''))hide(e)});document.querySelectorAll('#dashboard .dash-snapshot-grid .snapshot-card').forEach(e=>{if(/^\s*Fees\b/i.test(e.textContent||''))hide(e)});if(role()==='student')document.querySelectorAll('#dashboard [data-action="openStudent"]').forEach(hide)}
-function applyStudents(){const officeAssistant=role()==='officeassistant',restricted=!!role()&&!privileged()&&!officeAssistant,page=document.getElementById('students');if(!page)return;page.classList.toggle('v156-restricted',restricted);if(privileged()||officeAssistant)return;document.querySelectorAll('#students [data-action="openStudent"],#students #bulkStudentPanel').forEach(hide);const search=document.getElementById('search');if(search){search.value='';search.disabled=true;search.placeholder='Name / Father / Mother';}document.querySelectorAll('#studentRows .edit,#studentRows .del,#studentRows .view,#studentRows [data-idcard],#studentRows [data-profile]').forEach(disable)}
+function applyStudents(){const officeAssistant=role()==='officeassistant',restricted=!!role()&&!privileged()&&!officeAssistant,page=document.getElementById('students');if(!page)return;page.classList.toggle('v156-restricted',restricted);if(privileged()||officeAssistant){if(officeAssistant){page.classList.remove('v156-restricted');page.querySelectorAll('.v156-hidden').forEach(e=>e.classList.remove('v156-hidden'));page.querySelectorAll('.v156-disabled').forEach(e=>{e.disabled=false;e.classList.remove('v156-disabled');e.removeAttribute('aria-disabled')});const search=document.getElementById('search');if(search){search.disabled=false;search.placeholder='Search by Name / Father / Mother / Mobile';}}return;}document.querySelectorAll('#students [data-action="openStudent"],#students #bulkStudentPanel').forEach(hide);const search=document.getElementById('search');if(search){search.value='';search.disabled=true;search.placeholder='Name / Father / Mother';}document.querySelectorAll('#studentRows .edit,#studentRows .del,#studentRows .view,#studentRows [data-idcard],#studentRows [data-profile]').forEach(disable)}
 function applyTimetable(){if(privileged())return;['v73Period','v73Start','v73End','v73Subject','v73Teacher','v73Room'].forEach(id=>disable(document.getElementById(id)));['v73Save','v73Clear','v73Print','v73ClearClass','v98TTTeacherPrint','v98TTExport'].forEach(id=>disable(document.getElementById(id)));const tv=document.getElementById('v98TTTeacher');if(tv)tv.disabled=false}
 function applyParent(){if(privileged())return;['v76FatherMobile','v76MotherMobile','v76GuardianMobile','v76Emergency'].forEach(id=>{const e=document.getElementById(id);if(e){e.value='';hide(e.closest('label')||e)}});disable(document.getElementById('v76Save'));['v76Print','v76Export'].forEach(id=>disable(document.getElementById(id)));document.querySelectorAll('#v76Table button').forEach(disable)}
 function applyFees(){if(privileged())return;['topCollectFeeBtn','v87FeeBulkPanel','v88FeeStructurePanel','v89FeeDashboard'].forEach(id=>hide(document.getElementById(id)));document.querySelectorAll('#fees .payBtn,#fees .receiptBtn').forEach(disable)}
