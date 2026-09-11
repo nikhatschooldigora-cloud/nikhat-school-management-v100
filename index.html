@@ -720,8 +720,7 @@ if(document.readyState!=='loading'){} else {}
 <select id="tGender"><option value="">Gender / लिंग</option><option>Male / पुरुष</option><option>Female / महिला</option><option>Other / अन्य</option></select>
 <input id="tDob" title="Date of Birth / जन्म तिथि" type="date"/>
 <input id="tJoining" title="Joining Date / नियुक्ति तिथि" type="date"/>
-<input id="tRole" list="staffRoleOptions" placeholder="Role / पद (Teacher, Peon...)" value="Teacher"/>
-<datalist id="staffRoleOptions"><option value="Teacher"><option value="Peon"><option value="Office Staff"><option value="Clerk"><option value="Principal"><option value="Accountant"></datalist>
+<input id="tRole" placeholder="Role / पद (Teacher, Principal, Clerk...)" value="Teacher"/>
 <input id="tSubject" placeholder="Subject / विषय"/>
 <input id="tQualification" placeholder="Qualification / शैक्षणिक योग्यता"/>
 <input id="tMobile" inputmode="numeric" maxlength="10" placeholder="Mobile / मोबाइल"/>
@@ -2067,8 +2066,8 @@ const defaults=[
 {id:'u_teacher',name:'Teacher',username:'teacher',password:'teacher123',role:'teacher'},
 {id:'u_accountant',name:'Accountant',username:'accountant',password:'accountant123',role:'accountant'},
 {id:'u_office',name:'Office Staff',username:'office',password:'office123',role:'office'}];
-const perms={admin:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','backup','exams','notices','userManagement','centralDatabase','systemHealth'],principal:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','exams','notices','systemHealth'],teacher:['dashboard','students','attendance','timetable','homework','exams','communication','parentContacts','notices'],accountant:['dashboard','students','fees','reports','communication','parentContacts'],office:['dashboard','students','idcards','staffIdCards','certificates','communication','parentContacts','notices','reports'],officeAssistant:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],student:['dashboard','studentPortal'],guardian:['guardianPortal']};
-const rn={admin:'Admin',principal:'Principal',teacher:'Teacher',accountant:'Accountant',office:'Office Staff',officeAssistant:'Office Assistant',student:'Student',guardian:'Guardian'};
+const perms={admin:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','backup','exams','notices','userManagement','centralDatabase','systemHealth'],principal:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],teacher:['dashboard','students','attendance','timetable','homework','exams','communication','parentContacts','notices'],accountant:['dashboard','students','fees','reports','communication','parentContacts'],office:['dashboard','students','idcards','staffIdCards','certificates','communication','parentContacts','notices','reports'],officeassistant:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],student:['dashboard','studentPortal'],guardian:['guardianPortal']};
+const rn={admin:'Admin',principal:'Principal',teacher:'Teacher',accountant:'Accountant',office:'Office Staff',officeassistant:'Office Assistant',student:'Student',guardian:'Guardian'};
 let users=[];try{users=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){users=null}
 if(!Array.isArray(users)||!users.length){users=defaults;localStorage.setItem(KEY,JSON.stringify(users))}
 // Remove legacy remembered-login data from older builds; V122 never stores passwords in the remember key.
@@ -2077,11 +2076,11 @@ users=users.map(x=>({...x,username:String(x.username||'').trim(),password:String
 function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function persistUsers(){localStorage.setItem(KEY,JSON.stringify(users))}
 function current(){try{const raw=sessionStorage.getItem(SESSION);return raw?JSON.parse(raw):null}catch(e){return null}}
-function allowed(p){const u=current();return !!u&&(perms[u.role]||[]).includes(p)}
-function canStudentWrite(){const u=current();return !!u&&['admin','principal','accountant','officeassistant'].includes(String(u.role||'').toLowerCase())}
+function allowed(p){const u=current(),r=String(u?.role||'').toLowerCase();return !!u&&(perms[r]||[]).includes(p)}
+function canStudentWrite(){const u=current(),r=String(u?.role||'').toLowerCase();return !!u&&['admin','principal','accountant','officeassistant'].includes(r)}
 function applyStudentWriteAccess(){const can=canStudentWrite();document.querySelectorAll('#bulkStudentPanel,[data-student-write],#studentActions').forEach(e=>{if(e)e.style.display=can?'':'none'});document.querySelectorAll('[data-action="openStudent"]').forEach(e=>{e.style.display=can?'':'none'});document.querySelectorAll('#studentRows .edit,#studentRows .del').forEach(e=>{e.style.display=can?'':'none'});}
 
-function hideMenus(){const u=current();document.querySelectorAll('.nav button[data-page]').forEach(b=>{b.style.display=(u&&(perms[u.role]||[]).includes(b.dataset.page))?'':'none'});const badge=document.getElementById('v77UserBadge');if(badge)badge.textContent=u?(u.name+' • '+(rn[u.role]||u.role)):'';applyStudentWriteAccess()}
+function hideMenus(){const u=current(),r=String(u?.role||'').toLowerCase();document.querySelectorAll('.nav button[data-page]').forEach(b=>{b.style.display=(u&&(perms[r]||[]).includes(b.dataset.page))?'':'none'});const badge=document.getElementById('v77UserBadge');if(badge)badge.textContent=u?(u.name+' • '+(rn[u.role]||u.role)):'';applyStudentWriteAccess()}
 function logout(){sessionStorage.removeItem(SESSION);sessionStorage.removeItem('nms_login_remember_hint');location.reload()}
 function showLogin(){
  if(document.getElementById('v77Overlay'))return;
@@ -3532,21 +3531,19 @@ if ('serviceWorker' in navigator) {
 const PRIV=['admin','principal','accountant'];
 function role(){try{const x=JSON.parse(sessionStorage.getItem('nms_login_v77')||'null');return String(x?.role||'').toLowerCase()}catch(e){return ''}}
 function privileged(){return PRIV.includes(role())}
-function fullAccess(){return privileged()||role()==='officeassistant'}
 function hide(e){if(e)e.classList.add('v156-hidden')}
 function disable(e){if(e){e.disabled=true;e.classList.add('v156-disabled');e.setAttribute('aria-disabled','true')}}
-function applyLogo(){if(fullAccess())return;['schoolLogoFile','saveSchoolLogo','removeSchoolLogo'].forEach(id=>hide(document.getElementById(id)))}
+function applyLogo(){if(privileged())return;['schoolLogoFile','saveSchoolLogo','removeSchoolLogo'].forEach(id=>hide(document.getElementById(id)))}
 function applyDashboard(){if(privileged())return;document.querySelectorAll('[data-nms-fee="open"]').forEach(hide);hide(document.querySelector('#dashboard .dashCard[data-dash="fees"]'));['feeDue','dashCollected','dashPendingFees','dashFeePaid','dashFeeDue'].forEach(id=>{const e=document.getElementById(id);if(e)hide(e.closest('.card,.dash-mini,.snapshot-card'))});document.querySelectorAll('#dashboard .dash-summary .dash-mini').forEach(e=>{if(/Fee Collected|Fee Due Students/i.test(e.textContent||''))hide(e)});document.querySelectorAll('#dashboard .dash-snapshot-grid .snapshot-card').forEach(e=>{if(/^\s*Fees\b/i.test(e.textContent||''))hide(e)});if(role()==='student')document.querySelectorAll('#dashboard [data-action="openStudent"]').forEach(hide)}
+function fullAccess(){return privileged()||role()==='officeassistant'}
 function applyStudents(){const restricted=!!role()&&!fullAccess(),page=document.getElementById('students');if(!page)return;page.classList.toggle('v156-restricted',restricted);if(fullAccess())return;document.querySelectorAll('#students [data-action="openStudent"],#students #bulkStudentPanel').forEach(hide);const search=document.getElementById('search');if(search){search.value='';search.disabled=true;search.placeholder='Name / Father / Mother';}document.querySelectorAll('#studentRows .edit,#studentRows .del,#studentRows .view,#studentRows [data-idcard],#studentRows [data-profile]').forEach(disable)}
 function applyTimetable(){if(fullAccess())return;['v73Period','v73Start','v73End','v73Subject','v73Teacher','v73Room'].forEach(id=>disable(document.getElementById(id)));['v73Save','v73Clear','v73Print','v73ClearClass','v98TTTeacherPrint','v98TTExport'].forEach(id=>disable(document.getElementById(id)));const tv=document.getElementById('v98TTTeacher');if(tv)tv.disabled=false}
-function applyParent(){if(fullAccess())return;['v76FatherMobile','v76MotherMobile','v76GuardianMobile','v76Emergency'].forEach(id=>{const e=document.getElementById(id);if(e){e.value='';hide(e.closest('label')||e)}});disable(document.getElementById('v76Save'));['v76Print','v76Export'].forEach(id=>disable(document.getElementById(id)));document.querySelectorAll('#v76Table button').forEach(disable)}
+function applyParent(){if(privileged())return;['v76FatherMobile','v76MotherMobile','v76GuardianMobile','v76Emergency'].forEach(id=>{const e=document.getElementById(id);if(e){e.value='';hide(e.closest('label')||e)}});disable(document.getElementById('v76Save'));['v76Print','v76Export'].forEach(id=>disable(document.getElementById(id)));document.querySelectorAll('#v76Table button').forEach(disable)}
 function applyFees(){if(privileged())return;['topCollectFeeBtn','v87FeeBulkPanel','v88FeeStructurePanel','v89FeeDashboard'].forEach(id=>hide(document.getElementById(id)));document.querySelectorAll('#fees .payBtn,#fees .receiptBtn').forEach(disable)}
 function apply(){applyLogo();applyDashboard();applyStudents();applyTimetable();applyParent();applyFees()}
 function init(){apply();setTimeout(apply,250);setTimeout(apply,800)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
-let lastRole=''; let roleTimer=null;
-function stableApply(){try{const r=role(); if(r!==lastRole){lastRole=r; apply();} else {apply();}}catch(e){}}
-roleTimer=setInterval(stableApply,1000);
+new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});
 window.v156ApplyRolePermissions=apply;
 })();
 </script>
