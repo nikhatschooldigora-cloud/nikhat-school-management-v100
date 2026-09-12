@@ -1380,18 +1380,38 @@ function mergeFeeRecordsSafe(a,b){
     const ma=(A._syncMeta||{})[k]||{}, mb=(B._syncMeta||{})[k]||{}; const mm={...ma,...mb};
     for(const f of ['fee','openingDue','manualDue']){
       const ta=Number(ma[f]||0), tb=Number(mb[f]||0);
-      if(tb>ta) so[f]=sb[f]; else if(ta>tb) so[f]=sa[f];
+      if(tb>ta) so[f]=sb[f];
+      else if(ta>tb) so[f]=sa[f];
       else if(ta===0&&tb===0){
-        if(f==='openingDue' && sb.openingDue!==undefined && sa.openingDue===undefined) so[f]=sb.openingDue;
-        else if(f==='fee' && sb.fee!==undefined && sa.fee===undefined) so[f]=sb.fee;
-        else if(f==='manualDue' && sb.manualDue!==undefined && sa.manualDue===undefined) so[f]=sb.manualDue;
+        const av=Number(sa[f]); const bv=Number(sb[f]);
+        if(f==='manualDue' && (sa.openingDue!==undefined || sb.openingDue!==undefined)){
+          so.manualDue=0;
+        }else if(av===0 && bv!==0) so[f]=sb[f];
+        else if(bv===0 && av!==0) so[f]=sa[f];
+        else if(av!==bv && Number.isFinite(av)&&Number.isFinite(bv)) so[f]=Math.max(av,bv);
       }
     }
+    // openingDue is the authoritative carry-forward amount; never let an old manualDue inflate it.
+    if(so.openingDue!==undefined) so.manualDue=0;
     const tx=[...(Array.isArray(sa.txns)?sa.txns:[]),...(Array.isArray(sb.txns)?sb.txns:[])];
-    const tm=new Map(); tx.forEach(t=>{const id=String(t?.id||t?.receipt||((t?.date||'')+'|'+(t?.amount||0)+'|'+(t?.studentId||''))); if(!tm.has(id)||Number(t?.updatedAt||0)>Number(tm.get(id)?.updatedAt||0))tm.set(id,clone(t));});
+    const tm=new Map();
+    tx.forEach(t=>{const id=String(t?.id||t?.receipt||((t?.date||'')+'|'+(t?.amount||0)+'|'+(t?.studentId||''))); if(!tm.has(id)||Number(t?.updatedAt||0)>Number(tm.get(id)?.updatedAt||0))tm.set(id,clone(t));});
     so.txns=[...tm.values()]; out.sessions[k]=so; out._syncMeta[k]=mm;
   }
   for(const k of Object.keys(B)){if(k!=='sessions'&&k!=='_syncMeta'&&out[k]===undefined)out[k]=clone(B[k]);}
+  return out;
+}
+function mergeFeesSafe(a,b){
+  const A=(a&&typeof a==='object'&&!Array.isArray(a))?a:{};
+  const B=(b&&typeof b==='object'&&!Array.isArray(b))?b:{};
+  const out={};
+  const ids=new Set([...Object.keys(A),...Object.keys(B)]);
+  ids.forEach(id=>{
+    const ar=A[id], br=B[id];
+    if(ar===undefined){out[id]=clone(br);return}
+    if(br===undefined){out[id]=clone(ar);return}
+    out[id]=mergeFeeRecordsSafe(ar,br);
+  });
   return out;
 }
 function setStudentFee(id){const s=students.find(x=>String(x.id)===String(id));if(!s)return;const cur=feeStudentSummary(s),total=prompt(`Current session ${feeSessionKey()} total fee for ${s.name}`,String(cur.current.fee||''));if(total===null)return;const n=Number(String(total).replace(/,/g,''));if(n<0||Number.isNaN(n))return alert('Invalid fee');const rec=ensureCurrentFeeSession(id);rec.sessions[feeSessionKey()].fee=n;stampFeeField(rec,feeSessionKey(),'fee');save();renderFees();updateFeeDashboard()}
@@ -2304,7 +2324,7 @@ async function sync(reason){
     return true;
    });
   };
-  const keys=[...new Set([...cloud.keys(),...cloudKeys(),'nms_students','nms_teachers','nms_users_v77','nms_fees','nms_attendance','nms_marks'])];
+  const keys=[...new Set([...cloud.keys(),...cloudKeys(),'nms_students','nms_teachers','nms_users_v77','nms_fees','nms_attendance','nms_marks','nms_current_fee_session','nms_previous_fee_session'])];
   const changed=[]; let pushed=0;
   const stripStudents=v=>Array.isArray(v)?v.filter(x=>!studentDeleted(x)):v;
   const stripTeachers=v=>Array.isArray(v)?v.filter(x=>!teacherDeleted(x)):v;
@@ -2344,7 +2364,7 @@ async function sync(reason){
     const u=await client.from('school_kv').upsert({key:k,value:clone(clean),updated_at:new Date().toISOString()},{onConflict:'key'});
     if(u.error)throw u.error;pushed++;
    }else if(lv!==null&&cr){
-    let merged=(k==='nms_fees')?mergeFeeRecordsSafe(lv,cv):merge(lv,cv);
+    let merged=(k==='nms_fees')?mergeFeesSafe(lv,cv):merge(lv,cv);
     if(k==='nms_students')merged=stripStudents(merged);
     if(k==='nms_teachers')merged=stripTeachers(merged);
     if(k==='nms_users_v77')merged=sanitizeUsers(merged);
