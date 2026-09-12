@@ -1369,49 +1369,82 @@ function renderFeeStudentLedger(){const el=document.getElementById('feeStudentLe
 function openFee(id=null){try{const modal=document.getElementById('feeModal');if(!modal)throw new Error('Fee form not found');populateFeeStudents();const dateEl=document.getElementById('feeDate'),amtEl=document.getElementById('feeAmount'),modeEl=document.getElementById('feeMode'),typeEl=document.getElementById('feePaymentType'),noteEl=document.getElementById('feeNote'),studentEl=document.getElementById('feeStudent');if(dateEl)dateEl.value=new Date().toISOString().slice(0,10);if(amtEl)amtEl.value='';if(modeEl)modeEl.value='Cash';if(typeEl)typeEl.value='both';if(noteEl)noteEl.value='';if(id&&studentEl)studentEl.value=String(id);renderFeeStudentLedger();modal.classList.remove('hidden');modal.style.display='flex';modal.setAttribute('aria-hidden','false');setTimeout(()=>{if(amtEl)amtEl.focus()},50)}catch(err){console.error(err);alert('Collect Fee open nahi ho pa raha. Error: '+(err&&err.message?err.message:err))}}
 function closeFeeModal(){const m=document.getElementById('feeModal');if(!m)return;m.classList.add('hidden');m.style.display='none';m.setAttribute('aria-hidden','true')}
 function saveFeeEntry(){try{const studentEl=document.getElementById('feeStudent'),amountEl=document.getElementById('feeAmount'),typeEl=document.getElementById('feePaymentType'),dateEl=document.getElementById('feeDate'),modeEl=document.getElementById('feeMode'),noteEl=document.getElementById('feeNote');if(!studentEl||!amountEl||!typeEl)throw new Error('Fee form fields missing');const sid=studentEl.value,amount=Number(String(amountEl.value||'').replace(/,/g,''));if(!sid)return alert('कृपया विद्यार्थी चुनें');if(!(amount>0))return alert('कृपया सही राशि भरें');const s=students.find(x=>String(x.id)===String(sid));if(!s)return alert('Student not found');const x=feeStudentSummary(s),type=typeEl.value;if(x.totalDue<=0)return alert('इस विद्यार्थी की कोई बकाया फीस नहीं है। पहले Previous Due या Current Fee सेट करें।');if(type==='previous'&&amount>x.previous.due)return alert('राशि पिछले सत्र के बकाये से अधिक है');if(type==='current'&&amount>x.current.due)return alert('राशि वर्तमान सत्र के बकाये से अधिक है');if(type==='both'&&amount>x.totalDue)return alert('जमा राशि कुल बकाये से अधिक है');let prevAmt=0,curAmt=0;if(type==='previous')prevAmt=amount;else if(type==='current')curAmt=amount;else{prevAmt=Math.min(amount,x.previous.due);curAmt=Math.min(amount-prevAmt,x.current.due)}if(prevAmt+curAmt!==amount)return alert('राशि allocation में समस्या है। कृपया दोबारा प्रयास करें।');const rec=ensureCurrentFeeSession(sid),cur=rec.sessions[feeSessionKey()],receipt='REC'+new Date().getFullYear()+String(Date.now()).slice(-6),base={id:uid()+'f',receipt,date:(dateEl&&dateEl.value)||new Date().toISOString().slice(0,10),amount,mode:(modeEl&&modeEl.value)||'Cash',note:(noteEl&&noteEl.value||'').trim(),previousAmount:prevAmt,currentAmount:curAmt,allocated:'both',session:feeSessionKey(),studentId:sid};cur.txns.push(base);save();closeFeeModal();renderFees();updateFeeDashboard();alert(`Fee saved. Receipt No: ${receipt}\nPrevious Session: ${money(prevAmt)}\nCurrent Session: ${money(curAmt)}`)}catch(err){console.error('saveFeeEntry error',err);alert('Fee save nahi ho pa rahi. Error: '+(err&&err.message?err.message:err))}}
+function feeClone(v){try{return JSON.parse(JSON.stringify(v))}catch(e){return v}}
 function stampFeeField(rec,key,field){try{if(!rec||!rec.sessions||!rec.sessions[key])return;rec._syncMeta=rec._syncMeta&&typeof rec._syncMeta==='object'?rec._syncMeta:{};rec._syncMeta[key]=rec._syncMeta[key]&&typeof rec._syncMeta[key]==='object'?rec._syncMeta[key]:{};rec._syncMeta[key][field]=Date.now()}catch(e){}}
 function mergeFeeRecordsSafe(a,b){
-  const A=(a&&typeof a==='object'&&!Array.isArray(a))?clone(a):{}; const B=(b&&typeof b==='object'&&!Array.isArray(b))?clone(b):{};
-  const out={...A}; out.sessions={...(A.sessions||{})}; out._syncMeta={...(A._syncMeta||{})};
+  const A=(a&&typeof a==='object'&&!Array.isArray(a))?feeClone(a):{};
+  const B=(b&&typeof b==='object'&&!Array.isArray(b))?feeClone(b):{};
+  const out={...A};
+  out.sessions={...(A.sessions||{})};
+  out._syncMeta={...(A._syncMeta||{})};
   const keys=new Set([...Object.keys(A.sessions||{}),...Object.keys(B.sessions||{})]);
+  // Legacy top-level transactions are also imported into their proper session.
+  const addLegacy=(rec)=>{
+    const list=Array.isArray(rec?.txns)?rec.txns:[];
+    for(const t of list){
+      const sk=String(t?.session||feeSessionKey());
+      if(!out.sessions[sk])out.sessions[sk]={fee:0,txns:[]};
+      if(!Array.isArray(out.sessions[sk].txns))out.sessions[sk].txns=[];
+      keys.add(sk);
+    }
+  };
+  addLegacy(A); addLegacy(B);
   for(const k of keys){
-    const sa=(A.sessions||{})[k]||{}, sb=(B.sessions||{})[k]||{};
-    const so={...sa,...sb};
-    const ma=(A._syncMeta||{})[k]||{}, mb=(B._syncMeta||{})[k]||{}; const mm={...ma,...mb};
+    const sa=(A.sessions||{})[k]||{}, sb=(B.sessions||{})[k]||{}, so={...sa,...sb};
+    const ma=(A._syncMeta||{})[k]||{}, mb=(B._syncMeta||{})[k]||{}, mm={...ma,...mb};
     for(const f of ['fee','openingDue','manualDue']){
       const ta=Number(ma[f]||0), tb=Number(mb[f]||0);
-      if(tb>ta) so[f]=sb[f];
-      else if(ta>tb) so[f]=sa[f];
+      if(tb>ta)so[f]=sb[f];
+      else if(ta>tb)so[f]=sa[f];
       else if(ta===0&&tb===0){
-        const av=Number(sa[f]); const bv=Number(sb[f]);
-        if(f==='manualDue' && (sa.openingDue!==undefined || sb.openingDue!==undefined)){
-          so.manualDue=0;
-        }else if(av===0 && bv!==0) so[f]=sb[f];
-        else if(bv===0 && av!==0) so[f]=sa[f];
-        else if(av!==bv && Number.isFinite(av)&&Number.isFinite(bv)) so[f]=Math.max(av,bv);
+        const av=Number(sa[f]),bv=Number(sb[f]);
+        if(f==='manualDue'&&(sa.openingDue!==undefined||sb.openingDue!==undefined))so.manualDue=0;
+        else if(av===0&&bv!==0)so[f]=sb[f];
+        else if(bv===0&&av!==0)so[f]=sa[f];
+        else if(av!==bv&&Number.isFinite(av)&&Number.isFinite(bv))so[f]=Math.max(av,bv);
       }
     }
-    // openingDue is the authoritative carry-forward amount; never let an old manualDue inflate it.
-    if(so.openingDue!==undefined) so.manualDue=0;
-    const tx=[...(Array.isArray(sa.txns)?sa.txns:[]),...(Array.isArray(sb.txns)?sb.txns:[])];
+    if(so.openingDue!==undefined)so.manualDue=0;
+    const tx=[];
+    if(Array.isArray(sa.txns))tx.push(...sa.txns);
+    if(Array.isArray(sb.txns))tx.push(...sb.txns);
+    // Pull matching legacy transactions from both records too.
+    for(const rec of [A,B])for(const t of (Array.isArray(rec.txns)?rec.txns:[]))if(String(t?.session||feeSessionKey())===String(k))tx.push(t);
     const tm=new Map();
-    tx.forEach(t=>{const id=String(t?.id||t?.receipt||((t?.date||'')+'|'+(t?.amount||0)+'|'+(t?.studentId||''))); if(!tm.has(id)||Number(t?.updatedAt||0)>Number(tm.get(id)?.updatedAt||0))tm.set(id,clone(t));});
-    so.txns=[...tm.values()]; out.sessions[k]=so; out._syncMeta[k]=mm;
+    for(const t of tx){
+      if(!t||typeof t!=='object')continue;
+      const id=String(t.id||t.receipt||((t.date||'')+'|'+(t.amount||0)+'|'+(t.studentId||'')));
+      const prev=tm.get(id);
+      if(!prev||Number(t.updatedAt||0)>Number(prev.updatedAt||0))tm.set(id,feeClone(t));
+    }
+    so.txns=[...tm.values()];
+    out.sessions[k]=so; out._syncMeta[k]=mm;
   }
-  for(const k of Object.keys(B)){if(k!=='sessions'&&k!=='_syncMeta'&&out[k]===undefined)out[k]=clone(B[k]);}
+  // Keep a canonical top-level transaction union for older reports/receipts.
+  const top=[];
+  for(const rec of [A,B])if(Array.isArray(rec.txns))top.push(...rec.txns);
+  for(const k of Object.keys(out.sessions||{}))if(Array.isArray(out.sessions[k]?.txns))top.push(...out.sessions[k].txns);
+  const tmTop=new Map();
+  for(const t of top){
+    if(!t||typeof t!=='object')continue;
+    const id=String(t.id||t.receipt||((t.date||'')+'|'+(t.amount||0)+'|'+(t.studentId||'')));
+    const prev=tmTop.get(id);
+    if(!prev||Number(t.updatedAt||0)>Number(prev.updatedAt||0))tmTop.set(id,feeClone(t));
+  }
+  out.txns=[...tmTop.values()];
+  for(const k of Object.keys(B)){if(k!=='sessions'&&k!=='_syncMeta'&&k!=='txns'&&out[k]===undefined)out[k]=feeClone(B[k]);}
   return out;
 }
 function mergeFeesSafe(a,b){
   const A=(a&&typeof a==='object'&&!Array.isArray(a))?a:{};
   const B=(b&&typeof b==='object'&&!Array.isArray(b))?b:{};
   const out={};
-  const ids=new Set([...Object.keys(A),...Object.keys(B)]);
-  ids.forEach(id=>{
-    const ar=A[id], br=B[id];
-    if(ar===undefined){out[id]=clone(br);return}
-    if(br===undefined){out[id]=clone(ar);return}
-    out[id]=mergeFeeRecordsSafe(ar,br);
-  });
+  for(const id of new Set([...Object.keys(A),...Object.keys(B)])){
+    const ar=A[id],br=B[id];
+    if(ar===undefined){out[id]=feeClone(br);continue;}
+    if(br===undefined){out[id]=feeClone(ar);continue;}
+    try{out[id]=mergeFeeRecordsSafe(ar,br)}catch(e){console.warn('Fee merge skipped for student',id,e);out[id]=feeClone(ar);}
+  }
   return out;
 }
 function setStudentFee(id){const s=students.find(x=>String(x.id)===String(id));if(!s)return;const cur=feeStudentSummary(s),total=prompt(`Current session ${feeSessionKey()} total fee for ${s.name}`,String(cur.current.fee||''));if(total===null)return;const n=Number(String(total).replace(/,/g,''));if(n<0||Number.isNaN(n))return alert('Invalid fee');const rec=ensureCurrentFeeSession(id);rec.sessions[feeSessionKey()].fee=n;stampFeeField(rec,feeSessionKey(),'fee');save();renderFees();updateFeeDashboard()}
@@ -2332,6 +2365,7 @@ async function sync(reason){
 
   for(const k of keys){
    if(k==='nms_sync_deleted')continue;
+   try{
    const cr=cloud.get(k);
    const originalLv=read(k);
    let lv=originalLv, cv=cr?cr.value:null;
@@ -2375,6 +2409,7 @@ async function sync(reason){
      if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
     }
    }
+   }catch(keyErr){syncErrors.push({key:k,error:keyErr});console.warn('V159 V7 sync key failed:',k,keyErr)}
   }
 
   const finalUsers=sanitizeUsers(read('nms_users_v77'));
@@ -2382,7 +2417,7 @@ async function sync(reason){
    const cu=cloud.get('nms_users_v77'), cloudUsers=cu?sanitizeUsers(cu.value):null;
    if(!same(finalUsers,cloudUsers)){
     const u=await client.from('school_kv').upsert({key:'nms_users_v77',value:clone(finalUsers),updated_at:new Date().toISOString()},{onConflict:'key'});
-    if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
+    if(u.error){syncErrors.push({key:'nms_users_v77',error:u.error});}else pushed++;
    }
    if(!same(finalUsers,read('nms_users_v77'))){if(setLocal('nms_users_v77',finalUsers))changed.push('nms_users_v77')}
   }
@@ -2391,7 +2426,7 @@ async function sync(reason){
    const cs=cloud.get('nms_students'), cloudStudents=cs?stripStudents(cs.value):null;
    if(!same(finalStudents,cloudStudents)){
     const u=await client.from('school_kv').upsert({key:'nms_students',value:clone(finalStudents),updated_at:new Date().toISOString()},{onConflict:'key'});
-    if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
+    if(u.error){syncErrors.push({key:'nms_students',error:u.error});}else pushed++;
    }
   }
   const finalTeachers=stripTeachers(read('nms_teachers'));
@@ -2399,13 +2434,13 @@ async function sync(reason){
    const ct=cloud.get('nms_teachers'), cloudTeachers=ct?stripTeachers(ct.value):null;
    if(!same(finalTeachers,cloudTeachers)){
     const u=await client.from('school_kv').upsert({key:'nms_teachers',value:clone(finalTeachers),updated_at:new Date().toISOString()},{onConflict:'key'});
-    if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
+    if(u.error){syncErrors.push({key:'nms_teachers',error:u.error});}else pushed++;
    }
   }
   if(changed.length)refresh(changed);
-  if(syncErrors.length){const first=syncErrors[0]?.error||{};const msg=String(first.message||first.details||first.hint||first.code||first).slice(0,180);status(true,'Connected + Logged in • Sync Partial');info('sync partial • '+syncErrors.length+' error(s) • '+msg);console.warn('V159 V4 sync partial errors:',syncErrors);}else{status(true,'Connected + Logged in');info('V159 V4 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');}
+  if(syncErrors.length){const first=syncErrors[0]?.error||{};const msg=String(first.message||first.details||first.hint||first.code||first).slice(0,180);status(true,'Connected + Logged in • Sync Partial');info('sync partial • '+syncErrors.length+' error(s) • '+msg);console.warn('V159 V7 sync partial errors:',syncErrors);}else{status(true,'Connected + Logged in');info('V159 V7 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');}
  }catch(e){
-  console.warn('V159 V4 sync:',e); status(false,'Connected + Logged in • Sync Error');
+  console.warn('V159 V7 sync:',e); status(false,'Connected + Logged in • Sync Error');
   info('sync error • '+String(e.message||e).slice(0,180));
  }finally{busy=false}
 }
