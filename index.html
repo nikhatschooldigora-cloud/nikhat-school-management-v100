@@ -796,13 +796,39 @@ function freeLocalStorageForSync(){
     drop.forEach(k=>localStorage.removeItem(k));
   }catch(e){console.warn('Storage cleanup unavailable',e)}
 }
+function feeSyncStampChanges(prevRaw,next){
+  try{
+    const prev=typeof prevRaw==='string'?(JSON.parse(prevRaw)||{}):(prevRaw&&typeof prevRaw==='object'?prevRaw:{});
+    const now=Date.now();
+    const aa=prev&&typeof prev==='object'&&!Array.isArray(prev)?prev:{};
+    const bb=next&&typeof next==='object'&&!Array.isArray(next)?next:{};
+    for(const sid of new Set([...Object.keys(aa),...Object.keys(bb)])){
+      const a=aa[sid],b=bb[sid]; if(!b||typeof b!=='object')continue;
+      const as=a&&typeof a==='object'&&!Array.isArray(a)?a:{};
+      const bs=b&&typeof b==='object'&&!Array.isArray(b)?b:{};
+      const sessA=as.sessions&&typeof as.sessions==='object'&&!Array.isArray(as.sessions)?as.sessions:{};
+      const sessB=bs.sessions&&typeof bs.sessions==='object'&&!Array.isArray(bs.sessions)?bs.sessions:{};
+      for(const sk of Object.keys(sessB)){
+        const x=sessA[sk],y=sessB[sk]; if(!y||typeof y!=='object')continue;
+        const meta=(y._syncMeta&&typeof y._syncMeta==='object'&&!Array.isArray(y._syncMeta))?y._syncMeta:(y._syncMeta={});
+        for(const q of ['fee','openingDue','manualDue']){
+          const av=x&&typeof x==='object'?x[q]:undefined, bv=y[q];
+          if(JSON.stringify(av)!==JSON.stringify(bv))meta[q]=now;
+        }
+      }
+    }
+  }catch(e){console.warn('Fee sync stamp failed',e)}
+  return next;
+}
 function save(){
-  // Write only keys whose serialized value actually changed.  The previous
-  // save() wrote all five core keys on every operation, which made unrelated
-  // modules look dirty and created false sync conflicts.
   freeLocalStorageForSync();
   const pairs=[['nms_students',students],['nms_teachers',teachers],['nms_fees',fees],['nms_attendance',attendance],['nms_marks',marks]];
-  pairs.forEach(([k,v])=>{const next=JSON.stringify(v),prev=localStorage.getItem(k);if(prev!==next)localStorage.setItem(k,next)});
+  pairs.forEach(([k,v])=>{
+    const prev=localStorage.getItem(k);
+    const value=k==='nms_fees'?feeSyncStampChanges(prev,v):v;
+    const next=JSON.stringify(value);
+    if(prev!==next)localStorage.setItem(k,next);
+  });
 }
 function restoreStudentsBackup(){try{const b=JSON.parse(localStorage.getItem('nms_students_backup')||'[]');if(Array.isArray(b)&&b.length){students=b;normalizeStudents();renderStudents();renderClasses();updateDash();return true}}catch(e){}return false}
 
@@ -2243,10 +2269,19 @@ function mergeFeeRecord(a,b,preferLocal){
        const x=sa[sk],y=sb[sk];
        if(x&&typeof x==='object'&&!Array.isArray(x)&&y&&typeof y==='object'&&!Array.isArray(y)){
          const z={};
+         const xm=x._syncMeta&&typeof x._syncMeta==='object'&&!Array.isArray(x._syncMeta)?x._syncMeta:{};
+         const ym=y._syncMeta&&typeof y._syncMeta==='object'&&!Array.isArray(y._syncMeta)?y._syncMeta:{};
+         const zm={...xm}; for(const mk of Object.keys(ym))zm[mk]=Math.max(Number(xm[mk])||0,Number(ym[mk])||0);
          for(const q of new Set([...Object.keys(x),...Object.keys(y)])){
-           if(q==='txns')z[q]=mergeFeeTxns(x[q],y[q],preferLocal);
-           else z[q]=merge(x[q],y[q],preferLocal);
+           if(q==='txns'){z[q]=mergeFeeTxns(x[q],y[q],preferLocal);continue}
+           if(q==='_syncMeta')continue;
+           if(['fee','openingDue','manualDue'].includes(q)){
+             const xt=Number(xm[q])||0, yt=Number(ym[q])||0;
+             if(xt||yt)z[q]=clone(yt>xt?y[q]:x[q]);
+             else z[q]=merge(x[q],y[q],preferLocal);
+           }else z[q]=merge(x[q],y[q],preferLocal);
          }
+         if(Object.keys(zm).length)z._syncMeta=zm;
          so[sk]=z;
        }else so[sk]=merge(x,y,preferLocal);
      }
