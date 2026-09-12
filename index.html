@@ -365,7 +365,7 @@ if(document.readyState!=='loading'){} else {}
 <section class="page hidden" id="guardianPortal">
 <div class="panel"><div class="sectionHead"><div><h2>👨‍👩‍👧 Guardian Portal / अभिभावक पोर्टल</h2><p class="muted">Guardian अपने linked सभी बच्चों की profile, attendance, homework, notices, timetable, fees और results देख सकता है.</p></div><span class="v122-portal-badge">Guardian View</span></div><div id="guardianPortalContent"></div></div>
 </section>
-<section class="page hidden" id="userManagement"><div class="panel"><div class="sectionHead"><div><h2>🔐 Users & Permissions / यूज़र एवं अनुमति</h2><p class="muted">Admin can create users, assign roles, and automatically generate Student/Guardian login accounts.</p></div></div><div class="toolbar v77-user-form"><label>Full Name / नाम<input id="v77Name" placeholder="Teacher Name"></label><label>Username / यूज़रनेम<input id="v77Username" placeholder="teacher01"></label><label>Password / पासवर्ड<div style="display:flex;gap:6px;align-items:center"><input id="v77Password" type="password" placeholder="Password" style="flex:1"><button class="secondary" id="v77TogglePassword" type="button" title="Show/Hide password">👁️</button></div></label><label>Role / भूमिका<select id="v77Role"><option value="admin">Admin</option><option value="principal">Principal</option><option value="teacher">Teacher</option><option value="accountant">Accountant</option><option value="office">Office Staff</option><option value="officeAssistant">Office Assistant</option><option value="student">Student</option><option value="guardian">Guardian</option></select></label><button class="primary" id="v77SaveUser" type="button">💾 Save User</button><button class="secondary" id="v77ClearUser" type="button">🧹 Clear</button> <button class="secondary" id="v122GenerateAccounts" type="button">🔑 Generate Missing Student/Guardian Accounts</button></div><div id="v77UserTable" class="tablewrap" style="margin-top:14px"></div><div class="v77-note"><b>Account automation:</b> नए students के लिए Student और Guardian Login ID/password अपने-आप बनेंगे. Existing students के लिए ऊपर <b>Generate Missing Student/Guardian Accounts</b> दबाएँ.</div><div class="v77-note">ये browser/device-based accounts हैं. वास्तविक multi-device secure login और central data sync के लिए Supabase/Auth setup जरूरी है.</div></div></section>
+<section class="page hidden" id="userManagement"><div class="panel"><div class="sectionHead"><div><h2>🔐 Users & Permissions / यूज़र एवं अनुमति</h2><p class="muted">Admin can create users, assign roles, and automatically generate Student/Guardian login accounts.</p></div></div><div class="toolbar v77-user-form"><label>Full Name / नाम<input id="v77Name" placeholder="Teacher Name"></label><label>Username / यूज़रनेम<input id="v77Username" placeholder="teacher01"></label><label>Password / पासवर्ड<div style="display:flex;gap:6px;align-items:center"><input id="v77Password" type="password" placeholder="Password" style="flex:1"><button class="secondary" id="v77TogglePassword" type="button" title="Show/Hide password">👁️</button></div></label><label>Role / भूमिका<select id="v77Role"><option value="admin">Admin</option><option value="principal">Principal</option><option value="teacher">Teacher</option><option value="accountant">Accountant</option><option value="office">Office Staff</option><option value="student">Student</option><option value="guardian">Guardian</option></select></label><button class="primary" id="v77SaveUser" type="button">💾 Save User</button><button class="secondary" id="v77ClearUser" type="button">🧹 Clear</button> <button class="secondary" id="v122GenerateAccounts" type="button">🔑 Generate Missing Student/Guardian Accounts</button></div><div id="v77UserTable" class="tablewrap" style="margin-top:14px"></div><div class="v77-note"><b>Account automation:</b> नए students के लिए Student और Guardian Login ID/password अपने-आप बनेंगे. Existing students के लिए ऊपर <b>Generate Missing Student/Guardian Accounts</b> दबाएँ.</div><div class="v77-note">ये browser/device-based accounts हैं. वास्तविक multi-device secure login और central data sync के लिए Supabase/Auth setup जरूरी है.</div></div></section>
 <section class="page hidden" id="centralDatabase">
 <div class="panel">
 <div class="sectionHead"><div><h2>☁️ Cloud Database / क्लाउड डेटाबेस</h2><p class="muted">V80: Free Supabase cloud database से Android, laptop और दूसरे devices का school data एक जगह sync.</p></div><span class="v78-status" id="v80Status"><span class="v78-dot" id="v80Dot"></span><span id="v80StatusText">Local Mode • Cloud Setup Required</span></span></div>
@@ -720,8 +720,7 @@ if(document.readyState!=='loading'){} else {}
 <select id="tGender"><option value="">Gender / लिंग</option><option>Male / पुरुष</option><option>Female / महिला</option><option>Other / अन्य</option></select>
 <input id="tDob" title="Date of Birth / जन्म तिथि" type="date"/>
 <input id="tJoining" title="Joining Date / नियुक्ति तिथि" type="date"/>
-<input id="tRole" list="staffRoleOptions" placeholder="Role / पद (Teacher, Peon...)" value="Teacher"/>
-<datalist id="staffRoleOptions"><option value="Teacher"><option value="Peon"><option value="Office Staff"><option value="Clerk"><option value="Principal"><option value="Accountant"></datalist>
+<input id="tRole" placeholder="Role / पद (Teacher, Principal, Clerk...)" value="Teacher"/>
 <input id="tSubject" placeholder="Subject / विषय"/>
 <input id="tQualification" placeholder="Qualification / शैक्षणिक योग्यता"/>
 <input id="tMobile" inputmode="numeric" maxlength="10" placeholder="Mobile / मोबाइल"/>
@@ -2067,8 +2066,8 @@ const defaults=[
 {id:'u_teacher',name:'Teacher',username:'teacher',password:'teacher123',role:'teacher'},
 {id:'u_accountant',name:'Accountant',username:'accountant',password:'accountant123',role:'accountant'},
 {id:'u_office',name:'Office Staff',username:'office',password:'office123',role:'office'}];
-const perms={admin:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','backup','exams','notices','userManagement','centralDatabase','systemHealth'],principal:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','exams','notices','systemHealth'],teacher:['dashboard','students','attendance','timetable','homework','exams','communication','parentContacts','notices'],accountant:['dashboard','students','fees','reports','communication','parentContacts'],office:['dashboard','students','idcards','staffIdCards','certificates','communication','parentContacts','notices','reports'],officeAssistant:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],student:['dashboard','studentPortal'],guardian:['guardianPortal']};
-const rn={admin:'Admin',principal:'Principal',teacher:'Teacher',accountant:'Accountant',office:'Office Staff',officeAssistant:'Office Assistant',student:'Student',guardian:'Guardian'};
+const perms={admin:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','backup','exams','notices','userManagement','centralDatabase','systemHealth'],principal:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],teacher:['dashboard','students','attendance','timetable','homework','exams','communication','parentContacts','notices'],accountant:['dashboard','students','fees','reports','communication','parentContacts'],office:['dashboard','students','idcards','staffIdCards','certificates','communication','parentContacts','notices','reports'],student:['dashboard','studentPortal'],guardian:['guardianPortal']};
+const rn={admin:'Admin',principal:'Principal',teacher:'Teacher',accountant:'Accountant',office:'Office Staff',student:'Student',guardian:'Guardian'};
 let users=[];try{users=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){users=null}
 if(!Array.isArray(users)||!users.length){users=defaults;localStorage.setItem(KEY,JSON.stringify(users))}
 // Remove legacy remembered-login data from older builds; V122 never stores passwords in the remember key.
@@ -3394,22 +3393,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    // V164: one-time PWA cache reset. School data/localStorage is untouched.
-    (async function(){
-      const marker='nms_v165_cache_reset_done';
-      try {
-        if (!sessionStorage.getItem(marker)) {
-          sessionStorage.setItem(marker,'1');
-          const regs=await navigator.serviceWorker.getRegistrations();
-          await Promise.all(regs.map(r=>r.unregister().catch(()=>false)));
-          const keys=await caches.keys();
-          await Promise.all(keys.map(k=>caches.delete(k).catch(()=>false)));
-          location.reload();
-          return;
-        }
-      } catch(e) {}
-      navigator.serviceWorker.register('./sw.js?v=168',{scope:'./'}).then(function(reg){try{reg.update()}catch(e){}}).catch(function(){});
-    })();
+    navigator.serviceWorker.register('./sw.js', {scope: './'}).then(function(reg){try{reg.update()}catch(e){}}).catch(function () {});
   });
 }
 </script>
@@ -3536,7 +3520,7 @@ if ('serviceWorker' in navigator) {
 </script>
 
 
-<style id="v161-role-permission-safe">
+<style id="v156-role-permission-safe">
 .v156-hidden{display:none!important}.v156-disabled{pointer-events:none!important;opacity:.6!important}
 #students.v156-restricted #studentRows td:nth-child(1),#students.v156-restricted #studentRows td:nth-child(2),#students.v156-restricted #studentRows td:nth-child(4),#students.v156-restricted #studentRows td:nth-child(6),#students.v156-restricted #studentRows td:nth-child(7),#students.v156-restricted #studentRows td:nth-child(8),#students.v156-restricted #studentRows td:nth-child(9),#students.v156-restricted #studentRows td:nth-child(10),#students.v156-restricted #studentRows td:nth-child(11),#students.v156-restricted #studentRows td:nth-child(12),#students.v156-restricted table thead th:nth-child(1),#students.v156-restricted table thead th:nth-child(2),#students.v156-restricted table thead th:nth-child(4),#students.v156-restricted table thead th:nth-child(6),#students.v156-restricted table thead th:nth-child(7),#students.v156-restricted table thead th:nth-child(8),#students.v156-restricted table thead th:nth-child(9),#students.v156-restricted table thead th:nth-child(10),#students.v156-restricted table thead th:nth-child(11),#students.v156-restricted table thead th:nth-child(12){display:none!important}
 #students.v156-restricted #studentRows .nameBtn,#students.v156-restricted #studentRows button{pointer-events:none!important;cursor:default!important}
@@ -3551,7 +3535,7 @@ function hide(e){if(e)e.classList.add('v156-hidden')}
 function disable(e){if(e){e.disabled=true;e.classList.add('v156-disabled');e.setAttribute('aria-disabled','true')}}
 function applyLogo(){if(privileged())return;['schoolLogoFile','saveSchoolLogo','removeSchoolLogo'].forEach(id=>hide(document.getElementById(id)))}
 function applyDashboard(){if(privileged())return;document.querySelectorAll('[data-nms-fee="open"]').forEach(hide);hide(document.querySelector('#dashboard .dashCard[data-dash="fees"]'));['feeDue','dashCollected','dashPendingFees','dashFeePaid','dashFeeDue'].forEach(id=>{const e=document.getElementById(id);if(e)hide(e.closest('.card,.dash-mini,.snapshot-card'))});document.querySelectorAll('#dashboard .dash-summary .dash-mini').forEach(e=>{if(/Fee Collected|Fee Due Students/i.test(e.textContent||''))hide(e)});document.querySelectorAll('#dashboard .dash-snapshot-grid .snapshot-card').forEach(e=>{if(/^\s*Fees\b/i.test(e.textContent||''))hide(e)});if(role()==='student')document.querySelectorAll('#dashboard [data-action="openStudent"]').forEach(hide)}
-function applyStudents(){const officeAssistant=role()==='officeassistant',restricted=!!role()&&!privileged()&&!officeAssistant,page=document.getElementById('students');if(!page)return;page.classList.toggle('v156-restricted',restricted);if(privileged()||officeAssistant){if(officeAssistant){page.classList.remove('v156-restricted');page.querySelectorAll('.v156-hidden').forEach(e=>e.classList.remove('v156-hidden'));page.querySelectorAll('.v156-disabled').forEach(e=>{e.disabled=false;e.classList.remove('v156-disabled');e.removeAttribute('aria-disabled')});const search=document.getElementById('search');if(search){search.disabled=false;search.placeholder='Search by Name / Father / Mother / Mobile';}}return;}document.querySelectorAll('#students [data-action="openStudent"],#students #bulkStudentPanel').forEach(hide);const search=document.getElementById('search');if(search){search.value='';search.disabled=true;search.placeholder='Name / Father / Mother';}document.querySelectorAll('#studentRows .edit,#studentRows .del,#studentRows .view,#studentRows [data-idcard],#studentRows [data-profile]').forEach(disable)}
+function applyStudents(){const restricted=!!role()&&!privileged(),page=document.getElementById('students');if(!page)return;page.classList.toggle('v156-restricted',restricted);if(privileged())return;document.querySelectorAll('#students [data-action="openStudent"],#students #bulkStudentPanel').forEach(hide);const search=document.getElementById('search');if(search){search.value='';search.disabled=true;search.placeholder='Name / Father / Mother';}document.querySelectorAll('#studentRows .edit,#studentRows .del,#studentRows .view,#studentRows [data-idcard],#studentRows [data-profile]').forEach(disable)}
 function applyTimetable(){if(privileged())return;['v73Period','v73Start','v73End','v73Subject','v73Teacher','v73Room'].forEach(id=>disable(document.getElementById(id)));['v73Save','v73Clear','v73Print','v73ClearClass','v98TTTeacherPrint','v98TTExport'].forEach(id=>disable(document.getElementById(id)));const tv=document.getElementById('v98TTTeacher');if(tv)tv.disabled=false}
 function applyParent(){if(privileged())return;['v76FatherMobile','v76MotherMobile','v76GuardianMobile','v76Emergency'].forEach(id=>{const e=document.getElementById(id);if(e){e.value='';hide(e.closest('label')||e)}});disable(document.getElementById('v76Save'));['v76Print','v76Export'].forEach(id=>disable(document.getElementById(id)));document.querySelectorAll('#v76Table button').forEach(disable)}
 function applyFees(){if(privileged())return;['topCollectFeeBtn','v87FeeBulkPanel','v88FeeStructurePanel','v89FeeDashboard'].forEach(id=>hide(document.getElementById(id)));document.querySelectorAll('#fees .payBtn,#fees .receiptBtn').forEach(disable)}
@@ -3563,7 +3547,7 @@ window.v156ApplyRolePermissions=apply;
 })();
 </script>
 
-<style id="v161-contact-privacy">
+<style id="v157-contact-privacy">
 /* V157: Teacher login contact privacy */
 body.v157-teacher-contact-privacy #students #studentRows td:nth-child(7),
 body.v157-teacher-contact-privacy #students table thead th:nth-child(7),
@@ -3576,7 +3560,7 @@ body.v157-teacher-contact-privacy #parentContacts #v76Table th:nth-child(5),
 body.v157-teacher-contact-privacy #parentContacts #v76Table th:nth-child(6),
 body.v157-teacher-contact-privacy #parentContacts #v76Table th:nth-child(7){display:none!important}
 </style>
-<script id="v161-contact-privacy-script">
+<script id="v157-contact-privacy-script">
 (function(){
 'use strict';
 function r(){try{const u=JSON.parse(sessionStorage.getItem('nms_login_v77')||'null');return String(u?.role||'').toLowerCase()}catch(e){return ''}}
