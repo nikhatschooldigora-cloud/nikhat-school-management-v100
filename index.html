@@ -1435,15 +1435,56 @@ function mergeFeeRecordsSafe(a,b){
   for(const k of Object.keys(B)){if(k!=='sessions'&&k!=='_syncMeta'&&k!=='txns'&&out[k]===undefined)out[k]=feeClone(B[k]);}
   return out;
 }
-function mergeFeesSafe(a,b){
+function feeStudentIdentity(student,id){
+  if(student&&typeof student==='object'){
+    const adm=String(student.adm||student.admissionNo||'').trim().toLowerCase();
+    if(adm)return 'adm:'+adm;
+    const name=String(student.name||'').trim().toLowerCase();
+    const cls=String(student.cls||student.class||'').trim().toLowerCase();
+    const mobile=String(student.mobile||'').trim();
+    if(name&&cls&&mobile)return 'ncm:'+name+'|'+cls+'|'+mobile;
+    if(name&&cls)return 'nc:'+name+'|'+cls;
+    if(name)return 'name:'+name;
+  }
+  return 'id:'+String(id||'');
+}
+function mergeFeesSafe(a,b,localStudents,cloudStudents){
   const A=(a&&typeof a==='object'&&!Array.isArray(a))?a:{};
   const B=(b&&typeof b==='object'&&!Array.isArray(b))?b:{};
+  const LS=Array.isArray(localStudents)?localStudents:[];
+  const CS=Array.isArray(cloudStudents)?cloudStudents:[];
+  const localById=new Map(LS.map(s=>[String(s?.id||''),s]));
+  const cloudById=new Map(CS.map(s=>[String(s?.id||''),s]));
+  const groups=new Map();
+  const add=(source,recMap,byId)=>{
+    Object.keys(recMap||{}).forEach(id=>{
+      const rec=recMap[id];
+      const student=byId.get(String(id||''));
+      const identity=feeStudentIdentity(student,id);
+      let g=groups.get(identity);
+      if(!g){g={localIds:[],cloudIds:[],local:[],cloud:[]};groups.set(identity,g)}
+      if(source==='local'){g.localIds.push(String(id));g.local.push(rec)}
+      else {g.cloudIds.push(String(id));g.cloud.push(rec)}
+    });
+  };
+  add('local',A,localById);
+  add('cloud',B,cloudById);
   const out={};
-  for(const id of new Set([...Object.keys(A),...Object.keys(B)])){
-    const ar=A[id],br=B[id];
-    if(ar===undefined){out[id]=feeClone(br);continue;}
-    if(br===undefined){out[id]=feeClone(ar);continue;}
-    try{out[id]=mergeFeeRecordsSafe(ar,br)}catch(e){console.warn('Fee merge skipped for student',id,e);out[id]=feeClone(ar);}
+  for(const [identity,g] of groups){
+    try{
+      let merged=null;
+      const all=[...g.local,...g.cloud];
+      all.forEach(rec=>{merged=merged===null?feeClone(rec):mergeFeeRecordsSafe(merged,rec)});
+      // Prefer this device's student ID so its existing UI keeps pointing to the merged record.
+      const outId=g.localIds[0]||g.cloudIds[0]||identity;
+      out[outId]=merged||{};
+      // Preserve any additional unmatched IDs only when they belong to a genuinely different identity.
+      // Duplicate IDs within the same identity are intentionally collapsed.
+    }catch(e){
+      console.warn('Fee identity merge skipped',identity,e);
+      const fallbackId=g.localIds[0]||g.cloudIds[0]||identity;
+      out[fallbackId]=feeClone(g.local[0]||g.cloud[0]||{});
+    }
   }
   return out;
 }
@@ -2399,7 +2440,7 @@ async function sync(reason){
     const u=await client.from('school_kv').upsert({key:k,value:clone(clean),updated_at:new Date().toISOString()},{onConflict:'key'});
     if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
    }else if(lv!==null&&cr){
-    let merged=(k==='nms_fees')?mergeFeesSafe(lv,cv):merge(lv,cv);
+    let merged=(k==='nms_fees')?mergeFeesSafe(lv,cv,read('nms_students')||[],cloud.get('nms_students')?.value||[]):merge(lv,cv);
     if(k==='nms_students')merged=stripStudents(merged);
     if(k==='nms_teachers')merged=stripTeachers(merged);
     if(k==='nms_users_v77')merged=sanitizeUsers(merged);
@@ -2409,7 +2450,7 @@ async function sync(reason){
      if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
     }
    }
-   }catch(keyErr){syncErrors.push({key:k,error:keyErr});console.warn('V159 V7 sync key failed:',k,keyErr)}
+   }catch(keyErr){syncErrors.push({key:k,error:keyErr});console.warn('V159 V8 sync key failed:',k,keyErr)}
   }
 
   const finalUsers=sanitizeUsers(read('nms_users_v77'));
@@ -2438,9 +2479,9 @@ async function sync(reason){
    }
   }
   if(changed.length)refresh(changed);
-  if(syncErrors.length){const first=syncErrors[0]?.error||{};const msg=String(first.message||first.details||first.hint||first.code||first).slice(0,180);status(true,'Connected + Logged in • Sync Partial');info('sync partial • '+syncErrors.length+' error(s) • '+msg);console.warn('V159 V7 sync partial errors:',syncErrors);}else{status(true,'Connected + Logged in');info('V159 V7 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');}
+  if(syncErrors.length){const first=syncErrors[0]?.error||{};const msg=String(first.message||first.details||first.hint||first.code||first).slice(0,180);status(true,'Connected + Logged in • Sync Partial');info('sync partial • '+syncErrors.length+' error(s) • '+msg);console.warn('V159 V8 sync partial errors:',syncErrors);}else{status(true,'Connected + Logged in');info('V159 V8 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');}
  }catch(e){
-  console.warn('V159 V7 sync:',e); status(false,'Connected + Logged in • Sync Error');
+  console.warn('V159 V8 sync:',e); status(false,'Connected + Logged in • Sync Error');
   info('sync error • '+String(e.message||e).slice(0,180));
  }finally{busy=false}
 }
