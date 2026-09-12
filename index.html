@@ -2295,7 +2295,7 @@ async function sync(reason){
    });
   };
   const keys=[...new Set([...cloud.keys(),...cloudKeys(),'nms_students','nms_teachers','nms_users_v77','nms_fees','nms_attendance','nms_marks'])];
-  const changed=[]; let pushed=0;
+  const changed=[]; let pushed=0; const dirty=dirtyMap();
   const stripStudents=v=>Array.isArray(v)?v.filter(x=>!studentDeleted(x)):v;
   const stripTeachers=v=>Array.isArray(v)?v.filter(x=>!teacherDeleted(x)):v;
 
