@@ -1118,34 +1118,7 @@ function printPerformance(){
   const w=window.open('','_blank');if(!w){alert('Popup blocked.');return}
   w.document.write(`<html><head><title>Student Performance - Nikhat Middle School Digora</title><style>.print-school-head{display:flex;align-items:center;justify-content:center;gap:12px;text-align:center}.print-school-head img{image-rendering:auto;width:70px!important;height:70px!important;max-width:70px!important;max-height:70px!important;object-fit:contain;border-radius:50%;flex:0 0 70px}@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#111}.class-result-print{padding:12px}.result-title{text-align:center;margin-bottom:15px}.result-title h3{margin:0 0 5px}.class-result-print table{width:100%;border-collapse:collapse}.class-result-print th,.class-result-print td{border:1px solid #888;padding:5px 4px;text-align:center;font-size:10px}.class-result-print th:first-child,.class-result-print td:first-child{text-align:left}</style></head><body>${el.outerHTML}<script>window.onload=function(){window.print()}<\/script>
 
-<script id="v166-fees-reconciliation-final">
-(function(){
-'use strict';
-const CFG='nms_v80_cloud_config',FEE='nms_fees',STRUCT='nms_fee_structure_v88',DEL='nms_sync_deleted';
-let busy=false,timer=0;
-const J=(v,d)=>{try{return JSON.parse(v)}catch(e){return d}};
-const O=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
-const A=v=>Array.isArray(v)?v:[];
-const C=v=>{try{return JSON.parse(JSON.stringify(v))}catch(e){return v}};
-const S=(a,b)=>{try{return JSON.stringify(a)===JSON.stringify(b)}catch(e){return a===b}};
-function cfg(){return O(J(localStorage.getItem(CFG)||'{}',{}))}
-function deleted(t,sid,tomb){const r=String(t?.receipt||'');return !!r&&Object.values(tomb).some(d=>d&&d.type==='feeReceipt'&&String(d.studentId)===String(sid)&&String(d.receipt)===r)}
-function txid(t){return t?.id?'id:'+t.id:'r:'+String(t?.receipt||'')+'|'+String(t?.date||'')+'|'+String(t?.amount||0)+'|'+String(t?.mode||'')}
-function txmerge(a,b,sid,tomb){const m=new Map();for(const t of [...A(a),...A(b)]){if(deleted(t,sid,tomb))continue;const k=txid(t);if(!m.has(k))m.set(k,C(t));else m.set(k,{...m.get(k),...C(t)})}return [...m.values()]}
-function stamp(x,f){return Number(O(x?._syncMeta)[f])||0}
-function sessionMerge(a,b){const x=O(a),y=O(b),z={};for(const k of new Set([...Object.keys(x),...Object.keys(y)])){if(k==='_syncMeta'||k==='txns')continue;if(['fee','openingDue','manualDue'].includes(k)){const xt=stamp(x,k),yt=stamp(y,k);z[k]=(xt||yt)?C(yt>xt?y[k]:x[k]):C(x[k]!==undefined?x[k]:y[k])}else z[k]=C(x[k]!==undefined?x[k]:y[k])}z.txns=txmerge(x.txns,y.txns,'',{});const m={...O(x._syncMeta)};for(const k of Object.keys(O(y._syncMeta)))m[k]=Math.max(Number(m[k])||0,Number(y._syncMeta[k])||0);if(Object.keys(m).length)z._syncMeta=m;return z}
-function feesMerge(a,b,tomb){const x=O(a),y=O(b),out={};for(const sid of new Set([...Object.keys(x),...Object.keys(y)])){const A1=O(x[sid]),B1=O(y[sid]),r={};for(const k of new Set([...Object.keys(A1),...Object.keys(B1)])){if(k==='sessions'||k==='txns'||k==='_syncMeta')continue;r[k]=C(A1[k]!==undefined?A1[k]:B1[k])}r.txns=txmerge(A1.txns,B1.txns,sid,tomb);const sa=O(A1.sessions),sb=O(B1.sessions),ss={};for(const sk of new Set([...Object.keys(sa),...Object.keys(sb)])){ss[sk]=sessionMerge(sa[sk],sb[sk]);ss[sk].txns=txmerge(sa[sk]?.txns,sb[sk]?.txns,sid,tomb)}r.sessions=ss;out[sid]=r}return out}
-function strip(v,tomb){const out=C(O(v));for(const sid of Object.keys(out)){const r=O(out[sid]);r.txns=A(r.txns).filter(t=>!deleted(t,sid,tomb));for(const sk of Object.keys(O(r.sessions))){r.sessions[sk]=O(r.sessions[sk]);r.sessions[sk].txns=A(r.sessions[sk].txns).filter(t=>!deleted(t,sid,tomb))}out[sid]=r}return out}
-function structureMerge(a,b){const x=O(a),y=O(b),out={};for(const sk of new Set([...Object.keys(x),...Object.keys(y)])){const A1=O(x[sk]),B1=O(y[sk]),o={};for(const cl of new Set([...Object.keys(A1),...Object.keys(B1)])){const p=O(A1[cl]),q=O(B1[cl]);if(!Object.keys(p).length){o[cl]=C(q);continue}if(!Object.keys(q).length){o[cl]=C(p);continue}const z={};for(const f of new Set([...Object.keys(p),...Object.keys(q)])){if(f==='_syncMeta')continue;const pt=stamp(p,f),qt=stamp(q,f);z[f]=(pt||qt)?C(qt>pt?q[f]:p[f]):C(p[f]!==undefined?p[f]:q[f])}z._syncMeta={...O(p._syncMeta),...O(q._syncMeta)};o[cl]=z}out[sk]=o}return out}
-async function run(){if(busy)return;busy=true;try{const c=cfg();if(!c.url||!c.key||!window.supabase)return;const sb=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});const ss=await sb.auth.getSession();if(ss.error||!ss.data?.session)return;const q=await sb.from('school_kv').select('key,value,updated_at').in('key',[FEE,STRUCT,DEL]);if(q.error)throw q.error;const rows=new Map((q.data||[]).map(r=>[r.key,r]));const lt=O(J(localStorage.getItem(DEL)||'{}',{})),ct=O(rows.get(DEL)?.value),tomb={...ct,...lt};for(const k of Object.keys(ct))if(Number(ct[k]?.deletedAt||0)>Number(lt[k]?.deletedAt||0))tomb[k]=ct[k];localStorage.setItem(DEL,JSON.stringify(tomb));const tu=await sb.from('school_kv').upsert({key:DEL,value:tomb,updated_at:new Date().toISOString()},{onConflict:'key'});if(tu.error)throw tu.error;
-const lv=J(localStorage.getItem(FEE)||'{}',{}),cv=O(rows.get(FEE)?.value),fm=strip(feesMerge(lv,cv,tomb),tomb);if(!S(fm,lv)){localStorage.setItem(FEE,JSON.stringify(fm));try{fees=fm;renderFees?.();updateFeeDashboard?.();updateDash?.();renderFeeStudentLedger?.()}catch(e){}}if(!S(fm,cv)){const u=await sb.from('school_kv').upsert({key:FEE,value:fm,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error}
-const ls=J(localStorage.getItem(STRUCT)||'{}',{}),cs=O(rows.get(STRUCT)?.value),sm=structureMerge(ls,cs);if(!S(sm,ls)){localStorage.setItem(STRUCT,JSON.stringify(sm));try{window.v88FeeStructure?.render?.()}catch(e){}}if(!S(sm,cs)){const u=await sb.from('school_kv').upsert({key:STRUCT,value:sm,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error}
-}catch(e){console.warn('V166 Fees reconciler:',e)}finally{busy=false}}
-function start(){clearInterval(timer);timer=setInterval(run,4000);setTimeout(run,1200)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
-window.v166FeeReconcile=run;
-})();
-</script>
+
 </body></html>`);w.document.close();
 }
 
