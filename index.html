@@ -2288,8 +2288,9 @@ async function sync(reason){
    if((Number(v?.deletedAt)||0)>(Number(tomb[k]?.deletedAt)||0))tomb[k]=v;
   }
   try{localStorage.setItem('nms_sync_deleted',JSON.stringify(tomb))}catch(e){}
-  const tu=await client.from('school_kv').upsert({key:'nms_sync_deleted',value:tomb,updated_at:new Date().toISOString()},{onConflict:'key'});
-  if(tu.error)throw tu.error;
+  const syncErrors=[];
+  const safeUpsert=async(payload)=>{try{const rr=await client.from('school_kv').upsert(payload,{onConflict:'key'});if(rr.error){syncErrors.push({key:payload.key,error:rr.error});return false}return true}catch(err){syncErrors.push({key:payload.key,error:err});return false}};
+  await safeUpsert({key:'nms_sync_deleted',value:tomb,updated_at:new Date().toISOString()});
 
   const deletedStudents=Object.values(tomb).filter(x=>x&&x.type==='student');
   const deletedTeachers=Object.values(tomb).filter(x=>x&&x.type==='teacher');
@@ -2362,7 +2363,7 @@ async function sync(reason){
    }else if(lv!==null&&!cr){
     const clean=k==='nms_students'?stripStudents(lv):(k==='nms_teachers'?stripTeachers(lv):lv);
     const u=await client.from('school_kv').upsert({key:k,value:clone(clean),updated_at:new Date().toISOString()},{onConflict:'key'});
-    if(u.error)throw u.error;pushed++;
+    if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
    }else if(lv!==null&&cr){
     let merged=(k==='nms_fees')?mergeFeesSafe(lv,cv):merge(lv,cv);
     if(k==='nms_students')merged=stripStudents(merged);
@@ -2371,7 +2372,7 @@ async function sync(reason){
     if(!same(merged,lv)){if(setLocal(k,merged)){applyMemory(k,merged);changed.push(k)}}
     if(!same(merged,cv)){
      const u=await client.from('school_kv').upsert({key:k,value:clone(merged),updated_at:new Date().toISOString()},{onConflict:'key'});
-     if(u.error)throw u.error;pushed++;
+     if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
     }
    }
   }
@@ -2381,7 +2382,7 @@ async function sync(reason){
    const cu=cloud.get('nms_users_v77'), cloudUsers=cu?sanitizeUsers(cu.value):null;
    if(!same(finalUsers,cloudUsers)){
     const u=await client.from('school_kv').upsert({key:'nms_users_v77',value:clone(finalUsers),updated_at:new Date().toISOString()},{onConflict:'key'});
-    if(u.error)throw u.error;pushed++;
+    if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
    }
    if(!same(finalUsers,read('nms_users_v77'))){if(setLocal('nms_users_v77',finalUsers))changed.push('nms_users_v77')}
   }
@@ -2390,7 +2391,7 @@ async function sync(reason){
    const cs=cloud.get('nms_students'), cloudStudents=cs?stripStudents(cs.value):null;
    if(!same(finalStudents,cloudStudents)){
     const u=await client.from('school_kv').upsert({key:'nms_students',value:clone(finalStudents),updated_at:new Date().toISOString()},{onConflict:'key'});
-    if(u.error)throw u.error;pushed++;
+    if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
    }
   }
   const finalTeachers=stripTeachers(read('nms_teachers'));
@@ -2398,15 +2399,14 @@ async function sync(reason){
    const ct=cloud.get('nms_teachers'), cloudTeachers=ct?stripTeachers(ct.value):null;
    if(!same(finalTeachers,cloudTeachers)){
     const u=await client.from('school_kv').upsert({key:'nms_teachers',value:clone(finalTeachers),updated_at:new Date().toISOString()},{onConflict:'key'});
-    if(u.error)throw u.error;pushed++;
+    if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
    }
   }
   if(changed.length)refresh(changed);
-  status(true,'Connected + Logged in');
-  info('V148 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
+  if(syncErrors.length){const first=syncErrors[0]?.error||{};const msg=String(first.message||first.details||first.hint||first.code||first).slice(0,180);status(true,'Connected + Logged in • Sync Partial');info('sync partial • '+syncErrors.length+' error(s) • '+msg);console.warn('V159 V4 sync partial errors:',syncErrors);}else{status(true,'Connected + Logged in');info('V159 V4 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');}
  }catch(e){
-  console.warn('V146 sync:',e); status(false,'Connected + Logged in • Sync Error');
-  info('sync error • '+String(e.message||e).slice(0,140));
+  console.warn('V159 V4 sync:',e); status(false,'Connected + Logged in • Sync Error');
+  info('sync error • '+String(e.message||e).slice(0,180));
  }finally{busy=false}
 }
 function applyMemory(k,v){try{if(k==='nms_students'){students=Array.isArray(v)?v:[];normalizeStudents?.()}else if(k==='nms_teachers'){teachers=Array.isArray(v)?v:[]}else if(k==='nms_fees'){fees=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}else if(k==='nms_attendance'){attendance=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}else if(k==='nms_marks'){marks=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}}catch(e){}}
