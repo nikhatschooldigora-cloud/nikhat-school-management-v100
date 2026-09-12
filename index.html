@@ -3832,21 +3832,41 @@ window.printFeeLedger=function(){const box=ensureBox();const rows=students.map((
 
 
 
-<script id="v172-fees-reconciliation-combined-final">
+<script id="v174-fees-sync-due-authority">
 (function(){'use strict';
-const CFG='nms_v80_cloud_config',FEE='nms_fees',STRUCT='nms_fee_structure_v88',DEL='nms_sync_deleted';let running=false,timer=null;
-const J=(v,d)=>{try{return JSON.parse(v)}catch(e){return d}},O=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{},A=v=>Array.isArray(v)?v:[],C=v=>{try{return JSON.parse(JSON.stringify(v))}catch(e){return v}};
-const cfg=()=>O(J(localStorage.getItem(CFG)||'{}')), tomb=()=>O(J(localStorage.getItem(DEL)||'{}'));
-function delKey(sid,r){return 'feeReceipt|'+String(sid)+'|'+String(r)}
-function isDeleted(t,sid,T){const r=String(t?.receipt||'');return !!r&&Object.values(T||{}).some(d=>d&&d.type==='feeReceipt'&&String(d.studentId)===String(sid)&&String(d.receipt)===r)}
-function harvest(v,T){for(const [sid,rec] of Object.entries(O(v))){for(const [r,deletedAt] of Object.entries(O(rec?._deletedReceipts))){const k=delKey(sid,r);if(Number(deletedAt||0)>=Number(T[k]?.deletedAt||0))T[k]={type:'feeReceipt',studentId:String(sid),receipt:String(r),deletedAt:Number(deletedAt)||Date.now()}}}}
-function txKey(t){return t?.id?'id:'+String(t.id):'r:'+String(t?.receipt||'')+'|'+String(t?.date||'')+'|'+String(t?.amount||0)+'|'+String(t?.mode||'')}
-function mergeTx(a,b,sid,T){const m=new Map();for(const t of [...A(a),...A(b)]){if(isDeleted(t,sid,T))continue;const k=txKey(t),old=m.get(k);if(!old)m.set(k,C(t));else m.set(k,Number(t.updatedAt||0)>=Number(old.updatedAt||0)?{...old,...C(t)}:{...C(old),...t})}return [...m.values()]}
-function mergeSession(a,b,sid,T){const x=O(a),y=O(b),z={};for(const f of new Set([...Object.keys(x),...Object.keys(y)])){if(f==='txns'||f==='_syncMeta')continue;const xs=Number(O(x._syncMeta)[f])||0,ys=Number(O(y._syncMeta)[f])||0;z[f]=xs||ys?(ys>xs?C(y[f]):C(x[f])):C(x[f]!==undefined?x[f]:y[f])}z.txns=mergeTx(x.txns,y.txns,sid,T);z._syncMeta={...O(x._syncMeta),...O(y._syncMeta)};return z}
-function mergeFeesSafe(a,b,T){const x=O(a),y=O(b),out={};for(const sid of new Set([...Object.keys(x),...Object.keys(y)])){const A1=O(x[sid]),B1=O(y[sid]),r={};const da=O(A1._deletedReceipts),db=O(B1._deletedReceipts),dr={...da,...db};for(const k of Object.keys(dr))dr[k]=Math.max(Number(da[k])||0,Number(db[k])||0);for(const f of new Set([...Object.keys(A1),...Object.keys(B1)])){if(f==='sessions'||f==='txns'||f==='_syncMeta'||f==='_deletedReceipts')continue;r[f]=C(A1[f]!==undefined?A1[f]:B1[f])}r.txns=mergeTx(A1.txns,B1.txns,sid,T);const sa=O(A1.sessions),sb=O(B1.sessions),ss={};for(const sk of new Set([...Object.keys(sa),...Object.keys(sb)]))ss[sk]=mergeSession(sa[sk],sb[sk],sid,T);r.sessions=ss;r._deletedReceipts=dr;r._syncMeta={...O(A1._syncMeta),...O(B1._syncMeta)};out[sid]=r}return out}
-function clean(v,T){const out=C(O(v));for(const sid of Object.keys(out)){const r=O(out[sid]);r.txns=A(r.txns).filter(t=>!isDeleted(t,sid,T));for(const [rct,dt] of Object.entries(O(r._deletedReceipts))){const k=delKey(sid,rct);if(Number(dt||0)>Number(T[k]?.deletedAt||0))T[k]={type:'feeReceipt',studentId:String(sid),receipt:String(rct),deletedAt:Number(dt)||Date.now()}}for(const sk of Object.keys(O(r.sessions))){const z=O(r.sessions[sk]);z.txns=A(z.txns).filter(t=>!isDeleted(t,sid,T));r.sessions[sk]=z}out[sid]=r}return out}
-async function run(){if(running)return;running=true;try{const c=cfg();if(!c.url||!c.key||!window.supabase)return;const sb=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});const ss=await sb.auth.getSession();if(ss.error||!ss.data?.session)return;const q=await sb.from('school_kv').select('key,value,updated_at').in('key',[FEE,STRUCT,DEL]);if(q.error)throw q.error;const rows=new Map((q.data||[]).map(x=>[x.key,x]));const T=tomb();const cloudDel=O(rows.get(DEL)?.value);for(const [k,v] of Object.entries(cloudDel))if(Number(v?.deletedAt||0)>=Number(T[k]?.deletedAt||0))T[k]=v;harvest(J(localStorage.getItem(FEE)||'{}',{}),T);harvest(rows.get(FEE)?.value,T);localStorage.setItem(DEL,JSON.stringify(T));let u=await sb.from('school_kv').upsert({key:DEL,value:T,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error;
- const lv=J(localStorage.getItem(FEE)||'{}',{}),cv=rows.get(FEE)?.value;const merged=clean(mergeFeesSafe(lv,cv,T),T);localStorage.setItem(FEE,JSON.stringify(merged));if(typeof fees!=='undefined')fees=merged;u=await sb.from('school_kv').upsert({key:FEE,value:merged,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error;try{renderFees?.();renderReceiptLedger?.();updateFeeDashboard?.();renderFeeStudentLedger?.()}catch(e){}
-}catch(e){console.warn('V172 Fees sync:',e)}finally{running=false}}
-function start(){clearInterval(timer);timer=setInterval(run,3000);setTimeout(run,800)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();window.v172FeeReconcile=run;window.v171FeeReconcile=run;})();</script>
+/* V174: single fee-sync authority.  Fee setup values (Previous Opening Due,
+   Current Fee and any manualDue) use per-field timestamps; payment receipts
+   remain unioned by receipt/id; deleted receipts remain tombstoned.  After
+   every merge the displayed Previous Due, Current Due and Total Due are
+   recalculated from the merged canonical data on both devices. */
+const CFG='nms_v80_cloud_config',FEE='nms_fees',STRUCT='nms_fee_structure_v88',DEL='nms_sync_deleted';
+let busy=false,timer=null;
+const J=(v,d)=>{try{return JSON.parse(v)}catch(e){return d}}, O=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{}, A=v=>Array.isArray(v)?v:[], C=v=>{try{return JSON.parse(JSON.stringify(v))}catch(e){return v}};
+const cfg=()=>O(J(localStorage.getItem(CFG)||'{}'));
+const tomb=()=>O(J(localStorage.getItem(DEL)||'{}'));
+const dkey=(sid,r)=>'feeReceipt|'+String(sid)+'|'+String(r);
+function isDel(t,sid,T){const r=String(t?.receipt||'');return !!r&&Object.values(T||{}).some(d=>d&&d.type==='feeReceipt'&&String(d.studentId)===String(sid)&&String(d.receipt)===r)}
+function harvest(v,T){for(const [sid,rec] of Object.entries(O(v))){for(const [r,at] of Object.entries(O(rec?._deletedReceipts))){const k=dkey(sid,r),n=Number(at)||Date.now();if(n>=Number(T[k]?.deletedAt||0))T[k]={type:'feeReceipt',studentId:String(sid),receipt:String(r),deletedAt:n}}}}
+function txKey(t){return t?.id?'id:'+String(t.id):'r:'+String(t?.receipt||'')+'|'+String(t?.date||'')+'|'+String(t?.amount||0)+'|'+String(t?.mode||'')+'|'+String(t?.studentId||'')}
+function mergeTx(a,b,sid,T){const m=new Map();for(const t of [...A(a),...A(b)]){if(isDel(t,sid,T))continue;const k=txKey(t),old=m.get(k);if(!old)m.set(k,C(t));else m.set(k,Number(t.updatedAt||0)>=Number(old.updatedAt||0)?{...old,...C(t)}:{...C(old),...t})}return [...m.values()]}
+function stamp(x,f){return Number(O(x?._syncMeta)[f])||0}
+function chooseField(x,y,f){const xt=stamp(x,f),yt=stamp(y,f);if(yt>xt)return C(y?.[f]);if(xt>yt)return C(x?.[f]);if(y?.[f]!==undefined&&x?.[f]===undefined)return C(y[f]);return C(x?.[f]!==undefined?x[f]:y?.[f])}
+function mergeSession(a,b,sid,T){const x=O(a),y=O(b),z={};for(const f of new Set([...Object.keys(x),...Object.keys(y)])){if(f==='txns'||f==='_syncMeta')continue;if(['fee','openingDue','manualDue'].includes(f))z[f]=chooseField(x,y,f);else z[f]=C(x[f]!==undefined?x[f]:y[f])}z.txns=mergeTx(x.txns,y.txns,sid,T);const m={...O(x._syncMeta),...O(y._syncMeta)};for(const f of new Set([...Object.keys(O(x._syncMeta)),...Object.keys(O(y._syncMeta))]))m[f]=Math.max(stamp(x,f),stamp(y,f));if(Object.keys(m).length)z._syncMeta=m;return z}
+function mergeRecord(a,b,sid,T){const x=O(a),y=O(b),z={};const da=O(x._deletedReceipts),db=O(y._deletedReceipts),dr={...da,...db};for(const r of Object.keys(dr))dr[r]=Math.max(Number(da[r])||0,Number(db[r])||0);for(const f of new Set([...Object.keys(x),...Object.keys(y)])){if(['sessions','txns','_deletedReceipts','_syncMeta'].includes(f))continue;z[f]=C(x[f]!==undefined?x[f]:y[f])}z.txns=mergeTx(x.txns,y.txns,sid,T);const sa=O(x.sessions),sb=O(y.sessions),ss={};for(const sk of new Set([...Object.keys(sa),...Object.keys(sb)]))ss[sk]=mergeSession(sa[sk],sb[sk],sid,T);z.sessions=ss;z._deletedReceipts=dr;z._syncMeta={...O(x._syncMeta),...O(y._syncMeta)};return z}
+function mergeFees(a,b,T){const x=O(a),y=O(b),out={};for(const sid of new Set([...Object.keys(x),...Object.keys(y)]))out[sid]=mergeRecord(x[sid],y[sid],sid,T);return out}
+function clean(v,T){const out=C(O(v));for(const sid of Object.keys(out)){const r=O(out[sid]);r.txns=A(r.txns).filter(t=>!isDel(t,sid,T));for(const sk of Object.keys(O(r.sessions))){const z=O(r.sessions[sk]);z.txns=A(z.txns).filter(t=>!isDel(t,sid,T));r.sessions[sk]=z}for(const [rct,at] of Object.entries(O(r._deletedReceipts))){const k=dkey(sid,rct);if(Number(at)>Number(T[k]?.deletedAt||0))T[k]={type:'feeReceipt',studentId:String(sid),receipt:String(rct),deletedAt:Number(at)||Date.now()}}out[sid]=r}return out}
+function stampLocalFeeChange(before,next){try{const a=O(before),b=O(next),now=Date.now();for(const sid of new Set([...Object.keys(a),...Object.keys(b)])){const x=O(a[sid]),y=O(b[sid]);for(const sk of new Set([...Object.keys(O(x.sessions)),...Object.keys(O(y.sessions))])){const xx=O(x.sessions[sk]),yy=O(y.sessions[sk]);for(const f of ['fee','openingDue','manualDue'])if(JSON.stringify(xx[f])!==JSON.stringify(yy[f])){yy._syncMeta=O(yy._syncMeta);yy._syncMeta[f]=now}}}}catch(e){}return next}
+async function run(){if(busy)return;busy=true;try{const c=cfg();if(!c.url||!c.key||!window.supabase)return;const sb=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});const auth=await sb.auth.getSession();if(auth.error||!auth.data?.session)return;const q=await sb.from('school_kv').select('key,value,updated_at').in('key',[FEE,DEL]);if(q.error)throw q.error;const rows=new Map((q.data||[]).map(r=>[r.key,r]));const T=tomb();for(const [k,v] of Object.entries(O(rows.get(DEL)?.value)))if(Number(v?.deletedAt||0)>=Number(T[k]?.deletedAt||0))T[k]=v;harvest(J(localStorage.getItem(FEE)||'{}',{}),T);harvest(rows.get(FEE)?.value,T);localStorage.setItem(DEL,JSON.stringify(T));let u=await sb.from('school_kv').upsert({key:DEL,value:T,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error;
+ const before=J(localStorage.getItem(FEE)||'{}',{}), cloud=rows.get(FEE)?.value||{};
+ const localStamped=stampLocalFeeChange(before,before);
+ const merged=clean(mergeFees(localStamped,cloud,T),T);
+ const mergedText=JSON.stringify(merged), oldText=localStorage.getItem(FEE)||'{}';
+ if(oldText!==mergedText){localStorage.setItem(FEE,mergedText);try{if(typeof fees!=='undefined')fees=merged}catch(e){}}
+ const cloudText=JSON.stringify(cloud);if(cloudText!==mergedText){u=await sb.from('school_kv').upsert({key:FEE,value:merged,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error}
+ try{renderFees?.();renderReceiptLedger?.();updateFeeDashboard?.();renderFeeStudentLedger?.();updateDash?.()}catch(e){}
+}catch(e){console.warn('V174 fee sync:',e)}finally{busy=false}}
+function start(){clearInterval(timer);timer=setInterval(run,2500);setTimeout(run,500)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+window.v174FeeReconcile=run;window.v172FeeReconcile=run;window.v171FeeReconcile=run;
+})();</script>
 </body></html>
