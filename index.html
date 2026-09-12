@@ -760,7 +760,7 @@ function loadXLSX(callback){
 </script>
 <script>
 /* V145 FIX: expose student-write permission globally. V145 defined canStudentWrite inside the V77 IIFE, so Add Student raised "canStudentWrite is not defined" in the main app and V121 bulk handler. */
-function canStudentWrite(){try{const raw=sessionStorage.getItem('nms_login_v77');const u=raw?JSON.parse(raw):null;return !!u&&['admin','principal','accountant'].includes(u.role)}catch(e){return false}}
+function canStudentWrite(){try{const raw=sessionStorage.getItem('nms_login_v77');const u=raw?JSON.parse(raw):null;return !!u&&['admin','principal','accountant','office'].includes(u.role)}catch(e){return false}}
 const CLASSES=['LKG','UKG','1','2','3','4','5','6','7','8','9','10'];
 let students=JSON.parse(localStorage.getItem('nms_students')||'[]');
 let teachers=JSON.parse(localStorage.getItem('nms_teachers')||'[]');
@@ -2066,8 +2066,8 @@ const defaults=[
 {id:'u_teacher',name:'Teacher',username:'teacher',password:'teacher123',role:'teacher'},
 {id:'u_accountant',name:'Accountant',username:'accountant',password:'accountant123',role:'accountant'},
 {id:'u_office',name:'Office Staff',username:'office',password:'office123',role:'office'}];
-const perms={admin:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','backup','exams','notices','userManagement','centralDatabase','systemHealth'],principal:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],teacher:['dashboard','students','attendance','timetable','homework','exams','communication','parentContacts','notices'],accountant:['dashboard','students','fees','reports','communication','parentContacts'],office:['dashboard','students','idcards','staffIdCards','certificates','communication','parentContacts','notices','reports'],student:['dashboard','studentPortal'],guardian:['guardianPortal']};
-const rn={admin:'Admin',principal:'Principal',teacher:'Teacher',accountant:'Accountant',office:'Office Staff',student:'Student',guardian:'Guardian'};
+const perms={admin:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','fees','v65','backup','exams','notices','userManagement','centralDatabase','systemHealth'],principal:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],teacher:['dashboard','students','attendance','timetable','homework','exams','communication','parentContacts','notices'],accountant:['dashboard','students','fees','reports','communication','parentContacts'],office:['dashboard','students','idcards','staffIdCards','certificates','teachers','classes','attendance','timetable','homework','communication','parentContacts','reports','exams','notices'],student:['dashboard','studentPortal'],guardian:['guardianPortal']};
+const rn={admin:'Admin',principal:'Principal',teacher:'Teacher',accountant:'Accountant',office:'Office Assistant',student:'Student',guardian:'Guardian'};
 let users=[];try{users=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){users=null}
 if(!Array.isArray(users)||!users.length){users=defaults;localStorage.setItem(KEY,JSON.stringify(users))}
 // Remove legacy remembered-login data from older builds; V122 never stores passwords in the remember key.
@@ -2077,7 +2077,7 @@ function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function persistUsers(){localStorage.setItem(KEY,JSON.stringify(users))}
 function current(){try{const raw=sessionStorage.getItem(SESSION);return raw?JSON.parse(raw):null}catch(e){return null}}
 function allowed(p){const u=current();return !!u&&(perms[u.role]||[]).includes(p)}
-function canStudentWrite(){const u=current();return !!u&&['admin','principal','accountant'].includes(u.role)}
+function canStudentWrite(){const u=current();return !!u&&['admin','principal','accountant','office'].includes(u.role)}
 function applyStudentWriteAccess(){const can=canStudentWrite();document.querySelectorAll('#bulkStudentPanel,[data-student-write],#studentActions').forEach(e=>{if(e)e.style.display=can?'':'none'});document.querySelectorAll('[data-action="openStudent"]').forEach(e=>{e.style.display=can?'':'none'});document.querySelectorAll('#studentRows .edit,#studentRows .del').forEach(e=>{e.style.display=can?'':'none'});}
 
 function hideMenus(){const u=current();document.querySelectorAll('.nav button[data-page]').forEach(b=>{b.style.display=(u&&(perms[u.role]||[]).includes(b.dataset.page))?'':'none'});const badge=document.getElementById('v77UserBadge');if(badge)badge.textContent=u?(u.name+' • '+(rn[u.role]||u.role)):'';applyStudentWriteAccess()}
@@ -2204,32 +2204,30 @@ function initClient(){try{const c=cfg();if(!c.url||!c.key||!window.supabase){sta
 async function session(){if(!client&&!initClient())throw new Error('Cloud configuration नहीं मिली।');const r=await client.auth.getSession();if(r.error)throw r.error;if(!r.data.session)throw new Error('Cloud login required');return r.data.session}
 function cloudKeys(){const a=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!k.startsWith(PREFIX)||k===CFG)continue;if(k.startsWith('nms_v82_sync_')||k.startsWith('nms_v82_conflict')||k.startsWith('nms_v129_conflicts')||k.startsWith('nms_v131_')||k==='nms_sync_deleted'||k==='nms_students_backup'||k==='nms_full_autobackup'||k==='nms_remember_login_v77')continue;a.push(k)}return a}
 function keyOf(o){if(!o||typeof o!=='object')return null;for(const k of ['id','_id','adm','admissionNo','admission','scholarNo','empId','username','key'])if(o[k]!==undefined&&o[k]!==null&&String(o[k])!=='')return k+'='+String(o[k]);return null}
-function merge(a,b,localNewer=false){
- // V160 sync fix: merge records, but resolve edits by the side that actually
- // changed after its last successful sync. New records/transactions are still
- // unioned so two devices can add data independently without losing either side.
+function merge(a,b,preferLocal=false){
  if(a===undefined||a===null)return clone(b); if(b===undefined||b===null)return clone(a); if(same(a,b))return clone(a);
  if(Array.isArray(a)&&Array.isArray(b)){
-   const keyed=a.length===0||b.length===0|| (a.every(x=>keyOf(x))&&b.every(x=>keyOf(x)));
+   const keyed=a.length===0||b.length===0||(a.every(x=>keyOf(x))&&b.every(x=>keyOf(x)));
    if(keyed){
      const m=new Map();
-     for(const x of a){const k=keyOf(x);m.set(k||('anon:'+JSON.stringify(x)),x)}
-     for(const x of b){const k=keyOf(x)||('anon:'+JSON.stringify(x));m.set(k,m.has(k)?merge(m.get(k),x,localNewer):x)}
+     for(const x of a){const k=keyOf(x)||('anon:'+JSON.stringify(x));m.set(k,x)}
+     for(const x of b){const k=keyOf(x)||('anon:'+JSON.stringify(x));m.set(k,m.has(k)?merge(m.get(k),x,preferLocal):x)}
      return [...m.values()].map(clone);
    }
-   const out=[],seen=new Set();for(const x of [...a,...b]){let sig;try{sig=JSON.stringify(x)}catch(e){sig=String(x)}if(!seen.has(sig)){seen.add(sig);out.push(clone(x))}}return out;
+   const out=[],seen=new Set();
+   for(const x of [...a,...b]){let sig;try{sig=JSON.stringify(x)}catch(e){sig=String(x)}if(!seen.has(sig)){seen.add(sig);out.push(clone(x))}}
+   return out;
  }
  if(typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b)){
-   const o={};for(const k of new Set([...Object.keys(a),...Object.keys(b)]))o[k]=merge(a[k],b[k],localNewer);return o
+   const o={};for(const k of new Set([...Object.keys(a),...Object.keys(b)]))o[k]=merge(a[k],b[k],preferLocal);return o;
  }
- // For conflicting scalar fields, the newer side wins instead of always
- // favouring the device currently running the sync.
- return clone(localNewer?a:b);
+ return clone(preferLocal?a:b);
 }
-function dirtyMap(){try{return JSON.parse(localStorage.getItem(DIRTY)||'{}')||{}}catch(e){return {}}}
-function markDirty(k){try{if(!k||k===CFG||k.startsWith('nms_v131_'))return;const d=dirtyMap();d[k]=Date.now();localStorage.setItem(DIRTY,JSON.stringify(d))}catch(e){}}
-function clearDirty(k){try{const d=dirtyMap();if(Object.prototype.hasOwnProperty.call(d,k)){delete d[k];localStorage.setItem(DIRTY,JSON.stringify(d))}}catch(e){}}
-function localChangedAt(k){const d=dirtyMap();return Number(d[k])||0}
+const LOCAL_CHANGE_META='nms_v162_local_change_meta';
+function localChangeMap(){try{return JSON.parse(localStorage.getItem(LOCAL_CHANGE_META)||'{}')||{}}catch(e){return {}}}
+function noteLocalChange(k){try{if(!k||k===CFG||k===LOCAL_CHANGE_META||k.startsWith('nms_v82_sync_')||k.startsWith('nms_v129_conflicts')||k.startsWith('nms_v131_'))return;const m=localChangeMap();m[k]=Date.now();localStorage.setItem(LOCAL_CHANGE_META,JSON.stringify(m))}catch(e){}}
+function localChangedAt(k){return Number(localChangeMap()[k])||0}
+function clearLocalChange(k){try{const m=localChangeMap();if(Object.prototype.hasOwnProperty.call(m,k)){delete m[k];localStorage.setItem(LOCAL_CHANGE_META,JSON.stringify(m))}}catch(e){}}
 function setLocal(k,v){applying=true;try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){try{if(typeof freeLocalStorageForSync==='function')freeLocalStorageForSync();localStorage.setItem(k,JSON.stringify(v));return true}catch(e2){console.warn('sync local write failed',k,e2);return false}}finally{applying=false}}
 function refresh(keys){try{updateDash?.();renderStudents?.();renderClasses?.();renderTeachers?.();renderAttendance?.();renderMonthlyAttendance?.();renderFees?.();updateFeeDashboard?.();renderFeeStudentLedger?.();renderExamRows?.();renderExamList?.();}catch(e){}try{window.v77RenderUsers?.()}catch(e){}try{window.dispatchEvent(new CustomEvent('nms:cloudSyncUpdated',{detail:{keys}}))}catch(e){}}
 function applyConfigFromLink(){try{const p=new URLSearchParams(location.search),token=p.get('nms_cloud');if(!token)return;let b=token.replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';const c=JSON.parse(decodeURIComponent(escape(atob(b))));if(c&&c.url&&c.key){localStorage.setItem(CFG,JSON.stringify({url:String(c.url).replace(/\/$/,''),key:String(c.key)}));history.replaceState({},document.title,location.pathname+location.hash)}}catch(e){console.warn('Cloud setup link ignored',e)}}
@@ -2295,7 +2293,7 @@ async function sync(reason){
    });
   };
   const keys=[...new Set([...cloud.keys(),...cloudKeys(),'nms_students','nms_teachers','nms_users_v77','nms_fees','nms_attendance','nms_marks'])];
-  const changed=[]; let pushed=0; const dirty=dirtyMap();
+  const changed=[]; let pushed=0;
   const stripStudents=v=>Array.isArray(v)?v.filter(x=>!studentDeleted(x)):v;
   const stripTeachers=v=>Array.isArray(v)?v.filter(x=>!teacherDeleted(x)):v;
 
@@ -2332,18 +2330,12 @@ async function sync(reason){
    }else if(lv!==null&&!cr){
     const clean=k==='nms_students'?stripStudents(lv):(k==='nms_teachers'?stripTeachers(lv):lv);
     const u=await client.from('school_kv').upsert({key:k,value:clone(clean),updated_at:new Date().toISOString()},{onConflict:'key'});
-    if(u.error)throw u.error;pushed++;clearDirty(k);
+    if(u.error)throw u.error;pushed++;
    }else if(lv!==null&&cr){
-    const observedDirtyAt=Number(dirty[k])||0;
-    const localAt=observedDirtyAt;
+    const localAt=localChangedAt(k);
     const cloudAt=new Date(cr.updated_at||0).getTime()||0;
-    // If this device changed the key after the cloud version, its edit is newer.
-    // Otherwise the cloud version is newer. When neither side has a local dirty
-    // marker, keep the existing merge behaviour to avoid losing pre-fix data.
-    let keyPushed=false;
-    const localNewer=localAt>0&&localAt>cloudAt;
-    const cloudNewer=cloudAt>0&&(!localAt||cloudAt>=localAt);
-    let merged=localNewer?merge(lv,cv,true):cloudNewer?merge(lv,cv,false):merge(lv,cv,false);
+    const preferLocal=localAt>0&&localAt>cloudAt;
+    let merged=merge(lv,cv,preferLocal);
     if(k==='nms_students')merged=stripStudents(merged);
     if(k==='nms_teachers')merged=stripTeachers(merged);
     if(k==='nms_users_v77')merged=sanitizeUsers(merged);
@@ -2351,9 +2343,8 @@ async function sync(reason){
     if(!same(merged,cv)){
      const u=await client.from('school_kv').upsert({key:k,value:clone(merged),updated_at:new Date().toISOString()},{onConflict:'key'});
      if(u.error)throw u.error;pushed++;
-     keyPushed=true;
     }
-    if((same(merged,cv)||keyPushed)&&localChangedAt(k)===observedDirtyAt)clearDirty(k);
+    if(same(merged,cv)||!preferLocal)clearLocalChange(k);
    }
   }
 
@@ -2387,7 +2378,7 @@ async function sync(reason){
   info('V148 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');
  }catch(e){
   console.warn('V146 sync:',e); status(false,'Connected + Logged in • Sync Error');
-  info('sync error • '+String(e.message||e).slice(0,140));
+  info('sync error • '+String(e.message||e).slice(0,180));
  }finally{busy=false}
 }
 function applyMemory(k,v){try{if(k==='nms_students'){students=Array.isArray(v)?v:[];normalizeStudents?.()}else if(k==='nms_teachers'){teachers=Array.isArray(v)?v:[]}else if(k==='nms_fees'){fees=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}else if(k==='nms_attendance'){attendance=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}else if(k==='nms_marks'){marks=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}}catch(e){}}
@@ -2396,7 +2387,7 @@ async function download(){try{await session();const r=await client.from('school_
 async function initializeCloud(){try{await session();const keys=cloudKeys();let n=0;for(const k of keys){const lv=read(k);if(lv!==null){const r=await client.from('school_kv').upsert({key:k,value:clone(lv),updated_at:new Date().toISOString()},{onConflict:'key'});if(r.error)throw r.error;n++}}status(true,'Cloud Initialized • '+n+' items');info('cloud initialized');alert('Cloud initialization हो गया: '+n+' items.')}catch(e){alert('Cloud initialization failed: '+e.message)}}
 function init(){applyConfigFromLink();const u=document.getElementById('v80Url'),k=document.getElementById('v80Key'),c=cfg();if(u)u.value=c.url||'';if(k)k.value=c.key||'';document.getElementById('v80Connect')?.addEventListener('click',saveCfg);document.getElementById('v80Login')?.addEventListener('click',login);document.getElementById('v80Logout')?.addEventListener('click',logout);document.getElementById('v80Upload')?.addEventListener('click',upload);document.getElementById('v80Download')?.addEventListener('click',download);document.getElementById('v122InitializeCloud')?.addEventListener('click',initializeCloud);document.getElementById('v134ShareSetup')?.addEventListener('click',shareCloudSetup);document.getElementById('v123SyncNow')?.addEventListener('click',()=>sync('manual button'));if(initClient())authInfo();setTimeout(()=>sync('startup'),900);window.addEventListener('online',()=>schedule('online'));document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule('visible')});setInterval(()=>{if(document.visibilityState==='visible'&&!busy)schedule('background')},10000)}
 // Track user-created local changes. A cloud-applied write is shielded by `applying`.
-(function patchStorage(){if(window.__v131StoragePatched)return;window.__v131StoragePatched=true;const os=Storage.prototype.setItem,or=Storage.prototype.removeItem;Storage.prototype.setItem=function(k,v){os.call(this,k,v);if(this===localStorage&&!applying&&k&&k.startsWith(PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict')&&!k.startsWith('nms_v129_conflicts')&&!k.startsWith('nms_v131_')){markDirty(k);schedule('local change')}};Storage.prototype.removeItem=function(k){or.call(this,k);if(this===localStorage&&!applying&&k&&k.startsWith(PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict')&&!k.startsWith('nms_v129_conflicts')&&!k.startsWith('nms_v131_')){markDirty(k);schedule('local delete')}}})()
+(function patchStorage(){if(window.__v131StoragePatched)return;window.__v131StoragePatched=true;const os=Storage.prototype.setItem,or=Storage.prototype.removeItem;Storage.prototype.setItem=function(k,v){os.call(this,k,v);if(this===localStorage&&!applying&&k&&k.startsWith(PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict')&&!k.startsWith('nms_v129_conflicts')&&!k.startsWith('nms_v131_')){noteLocalChange(k);schedule('local change')}};Storage.prototype.removeItem=function(k){or.call(this,k);if(this===localStorage&&!applying&&k&&k.startsWith(PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict')&&!k.startsWith('nms_v129_conflicts')&&!k.startsWith('nms_v131_')){noteLocalChange(k);schedule('local delete')}}})();
 window.v80Upload=upload;window.v80Download=download;window.v80Test=testConnection;window.v123SyncNow=()=>sync('manual');window.v123RenderSyncConflicts=()=>{};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
@@ -3554,7 +3545,7 @@ if ('serviceWorker' in navigator) {
 <script>
 (function(){
 'use strict';
-const PRIV=['admin','principal','accountant'];
+const PRIV=['admin','principal','accountant','office'];
 function role(){try{const x=JSON.parse(sessionStorage.getItem('nms_login_v77')||'null');return String(x?.role||'').toLowerCase()}catch(e){return ''}}
 function privileged(){return PRIV.includes(role())}
 function hide(e){if(e)e.classList.add('v156-hidden')}
