@@ -1413,7 +1413,7 @@ function feeClassSummary(){const map={};students.forEach(s=>{const x=feeStudentS
 function exportFeeCSV(){const rows=[['Admission','Student','Class','Previous Opening Arrears','Previous Paid','Previous Due','Current Fee','Current Paid','Current Due','Total Paid','Total Due']];students.forEach(s=>{const x=feeStudentSummary(s);if(feeRecordHasData(fees[s.id])||x.total||x.paid||x.totalDue||x.tx.length)rows.push([s.adm,s.name,s.cls,x.previous.fee,x.previous.paid,x.previous.due,x.current.fee,x.current.paid,x.current.due,x.paid,x.totalDue])});const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`Fee_Report_${feeSessionKey()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function printFeeClassSummary(){const map={};students.forEach(s=>{const x=feeStudentSummary(s),k=s.cls||'—';if(!map[k])map[k]={students:0,paid:0,due:0};map[k].students++;map[k].paid+=x.paid;map[k].due+=x.totalDue});const rows=Object.keys(map).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).map(k=>`<tr><td>${k}</td><td>${map[k].students}</td><td>${money(map[k].paid)}</td><td>${money(map[k].due)}</td></tr>`).join('');const w=window.open('','_blank');if(!w){alert('Popup blocked.');return}w.document.write(`<html><head><title>Fee Class Summary</title><style>.print-school-head{display:flex;align-items:center;justify-content:center;gap:12px;text-align:center}.print-school-head img{image-rendering:auto;width:70px!important;height:70px!important;max-width:70px!important;max-height:70px!important;object-fit:contain;border-radius:50%;flex:0 0 70px}body{font-family:Arial;padding:25px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:8px}h1,h3{text-align:center}</style></head><body><div class="school-name-block"><h1>Nikhat Middle School Digora</h1><div class="dise-code">Dise Code - 23080208912</div></div><h3>Fee Class Summary — ${feeSessionKey()}</h3><table><tr><th>Class</th><th>Students</th><th>Total Paid</th><th>Total Due</th></tr>${rows}</table><script>window.print()<\/script></body></html>`);w.document.close()}
 function editFeeTransaction(sid,receipt){const rec=fees[sid],s=students.find(x=>String(x.id)===String(sid));if(!rec||!s)return;const all=Object.values(rec.sessions||{}).flatMap(z=>z.txns||[]).filter(t=>t.receipt===receipt);if(!all.length)return;const date=prompt('Receipt date (YYYY-MM-DD)',String(all[0].date||''));if(date===null)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return alert('Invalid date');const mode=prompt('Payment mode',String(all[0].mode||'Cash'));if(mode===null)return;const note=prompt('Note / टिप्पणी',String(all[0].note||''));if(note===null)return;Object.values(rec.sessions||{}).forEach(z=>(z.txns||[]).forEach(t=>{if(t.receipt===receipt){t.date=date;t.mode=String(mode);t.note=String(note)}}));save();renderFees();updateFeeDashboard();alert('Receipt details updated.')}
-function deleteFeeReceipt(sid,receipt){if(!confirm(`Receipt ${receipt} की पूरी payment हटानी है?\nPrevious/Current दोनों allocations साथ में हटेंगे.`))return;const rec=fees[sid];if(!rec)return;Object.values(rec.sessions||{}).forEach(z=>{z.txns=(z.txns||[]).filter(t=>t.receipt!==receipt)});rec.txns=(rec.txns||[]).filter(t=>t.receipt!==receipt);save();renderFees();updateFeeDashboard();alert('Receipt deleted.')}
+function deleteFeeReceipt(sid,receipt){if(!confirm(`Receipt ${receipt} की पूरी payment हटानी है?\nPrevious/Current दोनों allocations साथ में हटेंगे.`))return;const rec=fees[sid];if(!rec)return;const r=String(receipt);Object.values(rec.sessions||{}).forEach(z=>{z.txns=(z.txns||[]).filter(t=>String(t.receipt||'')!==r)});rec.txns=(rec.txns||[]).filter(t=>String(t.receipt||'')!==r);try{const k='feeReceipt|'+String(sid)+'|'+r;const d=JSON.parse(localStorage.getItem('nms_sync_deleted')||'{}')||{};d[k]={type:'feeReceipt',studentId:String(sid),receipt:r,deletedAt:Date.now()};localStorage.setItem('nms_sync_deleted',JSON.stringify(d))}catch(e){console.warn('Fee receipt tombstone failed',e)}save();renderFees();updateFeeDashboard();renderFeeStudentLedger?.();alert('Receipt deleted permanently. Syncing deletion to other devices…')}
 function getReceiptLedger(){
   const map=new Map();
   canonicalFeeData().tx.filter(t=>t.student).forEach((t,idx)=>{
@@ -2297,6 +2297,9 @@ function mergeFees(a,b,preferLocal){
  for(const sid of new Set([...Object.keys(aa),...Object.keys(bb)])){out[sid]=mergeFeeRecord(aa[sid],bb[sid],preferLocal)}
  return out;
 }
+function feeReceiptDeleted(t,tomb){if(!t||typeof t!=='object')return false;const sid=String(t.studentId||t.sid||t.student?.id||'');const r=String(t.receipt||'');return Object.values(tomb||{}).some(d=>d&&d.type==='feeReceipt'&&String(d.studentId)===sid&&String(d.receipt)===r)}
+function stripDeletedFeeData(v,tomb){if(!v||typeof v!=='object'||Array.isArray(v))return v;const out=clone(v);for(const sid of Object.keys(out)){const rec=out[sid];if(!rec||typeof rec!=='object')continue;if(Array.isArray(rec.txns))rec.txns=rec.txns.filter(t=>!feeReceiptDeleted({...t,studentId:t.studentId||sid},tomb));if(rec.sessions&&typeof rec.sessions==='object'){for(const sk of Object.keys(rec.sessions)){const z=rec.sessions[sk];if(z&&Array.isArray(z.txns))z.txns=z.txns.filter(t=>!feeReceiptDeleted({...t,studentId:t.studentId||sid},tomb))}}}return out}
+function mergeFeeStructure(a,b,preferLocal){const aa=a&&typeof a==='object'&&!Array.isArray(a)?a:{},bb=b&&typeof b==='object'&&!Array.isArray(b)?b:{};const out={};for(const sk of new Set([...Object.keys(aa),...Object.keys(bb)])){const A=aa[sk]&&typeof aa[sk]==='object'?aa[sk]:{},B=bb[sk]&&typeof bb[sk]==='object'?bb[sk]:{};const so={};for(const cls of new Set([...Object.keys(A),...Object.keys(B)])){const x=A[cls],y=B[cls];if(!x||typeof x!=='object'){so[cls]=clone(y);continue}if(!y||typeof y!=='object'){so[cls]=clone(x);continue}const xm=x._syncMeta&&typeof x._syncMeta==='object'?x._syncMeta:{},ym=y._syncMeta&&typeof y._syncMeta==='object'?y._syncMeta:{};const z={};for(const f of new Set([...Object.keys(x),...Object.keys(y)])){if(f==='_syncMeta')continue;if(['tuition','admission','exam','annual','other','total'].includes(f)){const xt=Number(xm[f])||0,yt=Number(ym[f])||0;z[f]=(xt||yt)?clone(yt>xt?y[f]:x[f]):clone(preferLocal?x[f]:y[f])}else z[f]=merge(x[f],y[f],preferLocal)}const meta={...xm};for(const f of Object.keys(ym))meta[f]=Math.max(Number(meta[f])||0,Number(ym[f])||0);if(Object.keys(meta).length)z._syncMeta=meta;so[cls]=z}out[sk]=so}return out}
 const LOCAL_CHANGE_META='nms_v162_local_change_meta';
 function localChangeMap(){try{return JSON.parse(localStorage.getItem(LOCAL_CHANGE_META)||'{}')||{}}catch(e){return {}}}
 function noteLocalChange(k){try{if(!k||k===CFG||k===LOCAL_CHANGE_META||k.startsWith('nms_v82_sync_')||k.startsWith('nms_v129_conflicts')||k.startsWith('nms_v131_'))return;const m=localChangeMap();m[k]=Date.now();localStorage.setItem(LOCAL_CHANGE_META,JSON.stringify(m))}catch(e){}}
@@ -2335,6 +2338,7 @@ async function sync(reason){
 
   const deletedStudents=Object.values(tomb).filter(x=>x&&x.type==='student');
   const deletedTeachers=Object.values(tomb).filter(x=>x&&x.type==='teacher');
+  const deletedFeeReceipts=Object.values(tomb).filter(x=>x&&x.type==='feeReceipt');
   const norm=v=>String(v??'').trim().toLowerCase();
   const studentDeleted=x=>deletedStudents.some(d=>{
     if(d.id!=null&&String(d.id)===String(x?.id))return true;
@@ -2398,6 +2402,10 @@ async function sync(reason){
      if(setLocal(k,filteredLv)){changed.push(k)}
     }
     lv=filteredLv; cv=filteredCv;
+   }else if(k==='nms_fees'){
+    const filteredLv=stripDeletedFeeData(lv,tomb), filteredCv=stripDeletedFeeData(cv,tomb);
+    if(!same(filteredLv,lv)){if(setLocal(k,filteredLv)){applyMemory(k,filteredLv);changed.push(k)}}
+    lv=filteredLv;cv=filteredCv;
    }
    if(lv===null&&cr){
     if(setLocal(k,cv)){applyMemory(k,cv);changed.push(k)}
@@ -2409,8 +2417,9 @@ async function sync(reason){
     const localAt=localChangedAt(k);
     const cloudAt=new Date(cr.updated_at||0).getTime()||0;
     const preferLocal=localAt>0&&localAt>cloudAt;
-    let merged=(k==='nms_fees')?mergeFees(lv,cv,preferLocal):merge(lv,cv,preferLocal);
+    let merged=(k==='nms_fees')?mergeFees(lv,cv,preferLocal):(k==='nms_fee_structure_v88'?mergeFeeStructure(lv,cv,preferLocal):merge(lv,cv,preferLocal));
     if(k==='nms_students')merged=stripStudents(merged);
+    if(k==='nms_fees')merged=stripDeletedFeeData(merged,tomb);
     if(k==='nms_teachers')merged=stripTeachers(merged);
     if(k==='nms_users_v77')merged=sanitizeUsers(merged);
     if(!same(merged,lv)){if(setLocal(k,merged)){applyMemory(k,merged);changed.push(k)}}
@@ -2717,7 +2726,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   const num=v=>{const n=Number(String(v??'').replace(/,/g,'').trim());return Number.isFinite(n)?n:0};
   function currentSession(){return clean($('currentFeeSession')?.value||localStorage.getItem('nms_current_fee_session')||'2026-27')}
   function data(){try{const x=JSON.parse(localStorage.getItem(KEY)||'{}');return x&&typeof x==='object'?x:{}}catch(e){return {}}}
-  function saveData(x){localStorage.setItem(KEY,JSON.stringify(x)); if(typeof save==='function')save()}
+  function stampStructureChanges(prev,next){try{const now=Date.now(),pa=prev&&typeof prev==='object'?prev:{},na=next&&typeof next==='object'?next:{};for(const sk of new Set([...Object.keys(pa),...Object.keys(na)])){const A=pa[sk]&&typeof pa[sk]==='object'?pa[sk]:{},B=na[sk]&&typeof na[sk]==='object'?na[sk]:{};for(const cls of new Set([...Object.keys(A),...Object.keys(B)])){if(!B[cls]||typeof B[cls]!=='object')continue;const old=A[cls]&&typeof A[cls]==='object'?A[cls]:{},row=B[cls];const meta=row._syncMeta&&typeof row._syncMeta==='object'?row._syncMeta:(row._syncMeta={});for(const f of ['tuition','admission','exam','annual','other','total']){if(JSON.stringify(old[f])!==JSON.stringify(row[f]))meta[f]=now}}}}catch(e){console.warn('Fee structure stamp failed',e)}return next}
+function saveData(x){const prev=(()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){return {}}})();const value=stampStructureChanges(prev,x);localStorage.setItem(KEY,JSON.stringify(value)); if(typeof save==='function')save()}
   function rowsFromData(){const d=data();return classes.map(cls=>{const x=d[currentSession()]?.[cls]||{};const r={session:currentSession(),cls,tuition:num(x.tuition),admission:num(x.admission),exam:num(x.exam),annual:num(x.annual),other:num(x.other)};r.total=num(x.total);if(!r.total)r.total=r.tuition+r.admission+r.exam+r.annual+r.other;return r})}
   function render(){const body=$('v88StructureRows');if(!body)return;body.innerHTML=rowsFromData().map((r,i)=>`<tr data-i="${i}"><td>${r.session}</td><td><b>${r.cls}</b></td><td><input class="v88-tuition" type="number" min="0" value="${r.tuition}"></td><td><input class="v88-admission" type="number" min="0" value="${r.admission}"></td><td><input class="v88-exam" type="number" min="0" value="${r.exam}"></td><td><input class="v88-annual" type="number" min="0" value="${r.annual}"></td><td><input class="v88-other" type="number" min="0" value="${r.other}"></td><td class="v88-total">₹${r.total.toLocaleString('en-IN')}</td></tr>`).join('');body.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{const tr=inp.closest('tr');const vals=[...tr.querySelectorAll('input')].map(x=>num(x.value));const total=vals.reduce((a,b)=>a+b,0);tr.querySelector('.v88-total').textContent='₹'+total.toLocaleString('en-IN')}))}
   function readRows(){return [...document.querySelectorAll('#v88StructureRows tr')].map(tr=>{const ins=[...tr.querySelectorAll('input')];const r={session:currentSession(),cls:clean(tr.children[1]?.textContent),tuition:num(ins[0]?.value),admission:num(ins[1]?.value),exam:num(ins[2]?.value),annual:num(ins[3]?.value),other:num(ins[4]?.value)};r.total=r.tuition+r.admission+r.exam+r.annual+r.other;return r})}
@@ -3666,6 +3676,24 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 setTimeout(apply,300);setTimeout(apply,1000);
 setInterval(apply,1000);
 window.v157ApplyContactPrivacy=apply;
+})();
+</script>
+
+<script id="v165-fees-complete-fix">
+(function(){
+  window.openStudentFeeLedger=function(sid){
+    try{
+      const s=students.find(x=>String(x.id)===String(sid));
+      if(!s){alert('Student record नहीं मिला।');return false}
+      const x=feeStudentSummary(s), tx=getStudentFeeTransactions(s);
+      const logo=(typeof getSchoolLogo==='function'?getSchoolLogo():'')||'';
+      const rows=tx.length?tx.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t.date||'')}</td><td>${esc(t.receipt||'-')}</td><td>${esc(t.session||'-')}</td><td>${t.previousAmount?money(t.previousAmount):t.allocated==='previous'?money(t.amount):money(0)}</td><td>${t.currentAmount?money(t.currentAmount):t.allocated==='current'?money(t.amount):money(0)}</td><td>${money(t.amount||0)}</td><td>${esc(t.mode||'Cash')}</td><td>${esc(t.note||'')}</td></tr>`).join(''):`<tr><td colspan="9" style="text-align:center">कोई payment transaction नहीं है।</td></tr>`;
+      const w=window.open('','_blank'); if(!w){alert('Ledger खोलने के लिए browser popup allow करें।');return false}
+      w.document.open();
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Student Fee Ledger</title><style>body{font-family:Arial,sans-serif;padding:22px;color:#222}.head{text-align:center}.logo{width:70px;height:70px;object-fit:contain}.info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0}.box{border:1px solid #bbb;border-radius:8px;padding:10px}.box b{display:block;font-size:16px;margin-top:4px}table{width:100%;border-collapse:collapse;margin-top:18px;font-size:12px}th,td{border:1px solid #aaa;padding:6px;text-align:left}button{padding:8px 16px;margin:12px 4px}@media print{button{display:none}}</style></head><body><div class="head">${logo?`<img class="logo" src="${logo}" alt="School Logo">`:''}<h1>Nikhat Middle School Digora</h1><div>Dise Code - 23080208912 • MP Board</div><h2>Student Fee Ledger</h2></div><p><b>Student:</b> ${esc(s.name)} &nbsp; <b>Admission:</b> ${esc(s.adm||'')} &nbsp; <b>Class:</b> ${esc(s.cls||'')}</p><div class="info"><div class="box"><small>Previous Session ${esc(previousSessionKey())}</small><b>Opening: ${money(x.previous.fee)}</b><div>Paid: ${money(x.previous.paid)} | Due: ${money(x.previous.due)}</div></div><div class="box"><small>Current Session ${esc(feeSessionKey())}</small><b>Fee: ${money(x.current.fee)}</b><div>Paid: ${money(x.current.paid)} | Due: ${money(x.current.due)}</div></div><div class="box"><small>Total Paid</small><b>${money(x.paid)}</b></div><div class="box"><small>Total Outstanding</small><b>${money(x.totalDue)}</b></div></div><table><tr><th>#</th><th>Date</th><th>Receipt</th><th>Session</th><th>Previous</th><th>Current</th><th>Total</th><th>Mode</th><th>Note</th></tr>${rows}</table><p style="text-align:right;font-size:18px"><b>Total Due: ${money(x.totalDue)}</b></p><div style="text-align:center"><button onclick="window.print()">Print Ledger</button><button onclick="window.close()">Close</button></div><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`);
+      w.document.close(); return false;
+    }catch(e){console.error(e);alert('Ledger खोलने में error: '+(e.message||e));return false}
+  };
 })();
 </script>
 </body></html>
