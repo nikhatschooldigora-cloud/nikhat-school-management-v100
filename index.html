@@ -3834,13 +3834,10 @@ window.printFeeLedger=function(){const box=ensureBox();const rows=students.map((
 
 <script id="v174-fees-sync-due-authority">
 (function(){'use strict';
-/* V174: single fee-sync authority.  Fee setup values (Previous Opening Due,
-   Current Fee and any manualDue) use per-field timestamps; payment receipts
-   remain unioned by receipt/id; deleted receipts remain tombstoned.  After
-   every merge the displayed Previous Due, Current Due and Total Due are
-   recalculated from the merged canonical data on both devices. */
-const CFG='nms_v80_cloud_config',FEE='nms_fees',STRUCT='nms_fee_structure_v88',DEL='nms_sync_deleted';
-let busy=false,timer=null;
+/* V174 mobile-safe fee sync: one Supabase client, one fee authority,
+   per-field due timestamps, receipt union + permanent delete tombstones. */
+const CFG='nms_v80_cloud_config',FEE='nms_fees',DEL='nms_sync_deleted';
+let busy=false,timer=null,sbClient=null;
 const J=(v,d)=>{try{return JSON.parse(v)}catch(e){return d}}, O=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{}, A=v=>Array.isArray(v)?v:[], C=v=>{try{return JSON.parse(JSON.stringify(v))}catch(e){return v}};
 const cfg=()=>O(J(localStorage.getItem(CFG)||'{}'));
 const tomb=()=>O(J(localStorage.getItem(DEL)||'{}'));
@@ -3855,17 +3852,9 @@ function mergeSession(a,b,sid,T){const x=O(a),y=O(b),z={};for(const f of new Set
 function mergeRecord(a,b,sid,T){const x=O(a),y=O(b),z={};const da=O(x._deletedReceipts),db=O(y._deletedReceipts),dr={...da,...db};for(const r of Object.keys(dr))dr[r]=Math.max(Number(da[r])||0,Number(db[r])||0);for(const f of new Set([...Object.keys(x),...Object.keys(y)])){if(['sessions','txns','_deletedReceipts','_syncMeta'].includes(f))continue;z[f]=C(x[f]!==undefined?x[f]:y[f])}z.txns=mergeTx(x.txns,y.txns,sid,T);const sa=O(x.sessions),sb=O(y.sessions),ss={};for(const sk of new Set([...Object.keys(sa),...Object.keys(sb)]))ss[sk]=mergeSession(sa[sk],sb[sk],sid,T);z.sessions=ss;z._deletedReceipts=dr;z._syncMeta={...O(x._syncMeta),...O(y._syncMeta)};return z}
 function mergeFees(a,b,T){const x=O(a),y=O(b),out={};for(const sid of new Set([...Object.keys(x),...Object.keys(y)]))out[sid]=mergeRecord(x[sid],y[sid],sid,T);return out}
 function clean(v,T){const out=C(O(v));for(const sid of Object.keys(out)){const r=O(out[sid]);r.txns=A(r.txns).filter(t=>!isDel(t,sid,T));for(const sk of Object.keys(O(r.sessions))){const z=O(r.sessions[sk]);z.txns=A(z.txns).filter(t=>!isDel(t,sid,T));r.sessions[sk]=z}for(const [rct,at] of Object.entries(O(r._deletedReceipts))){const k=dkey(sid,rct);if(Number(at)>Number(T[k]?.deletedAt||0))T[k]={type:'feeReceipt',studentId:String(sid),receipt:String(rct),deletedAt:Number(at)||Date.now()}}out[sid]=r}return out}
-function stampLocalFeeChange(before,next){try{const a=O(before),b=O(next),now=Date.now();for(const sid of new Set([...Object.keys(a),...Object.keys(b)])){const x=O(a[sid]),y=O(b[sid]);for(const sk of new Set([...Object.keys(O(x.sessions)),...Object.keys(O(y.sessions))])){const xx=O(x.sessions[sk]),yy=O(y.sessions[sk]);for(const f of ['fee','openingDue','manualDue'])if(JSON.stringify(xx[f])!==JSON.stringify(yy[f])){yy._syncMeta=O(yy._syncMeta);yy._syncMeta[f]=now}}}}catch(e){}return next}
-async function run(){if(busy)return;busy=true;try{const c=cfg();if(!c.url||!c.key||!window.supabase)return;const sb=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});const auth=await sb.auth.getSession();if(auth.error||!auth.data?.session)return;const q=await sb.from('school_kv').select('key,value,updated_at').in('key',[FEE,DEL]);if(q.error)throw q.error;const rows=new Map((q.data||[]).map(r=>[r.key,r]));const T=tomb();for(const [k,v] of Object.entries(O(rows.get(DEL)?.value)))if(Number(v?.deletedAt||0)>=Number(T[k]?.deletedAt||0))T[k]=v;harvest(J(localStorage.getItem(FEE)||'{}',{}),T);harvest(rows.get(FEE)?.value,T);localStorage.setItem(DEL,JSON.stringify(T));let u=await sb.from('school_kv').upsert({key:DEL,value:T,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error;
- const before=J(localStorage.getItem(FEE)||'{}',{}), cloud=rows.get(FEE)?.value||{};
- const localStamped=before;
- const merged=clean(mergeFees(localStamped,cloud,T),T);
- const mergedText=JSON.stringify(merged), oldText=localStorage.getItem(FEE)||'{}';
- if(oldText!==mergedText){localStorage.setItem(FEE,mergedText);try{if(typeof fees!=='undefined')fees=merged}catch(e){}}
- const cloudText=JSON.stringify(cloud);if(cloudText!==mergedText){u=await sb.from('school_kv').upsert({key:FEE,value:merged,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error}
- try{renderFees?.();renderReceiptLedger?.();updateFeeDashboard?.();renderFeeStudentLedger?.();updateDash?.()}catch(e){}
-}catch(e){console.warn('V174 fee sync:',e)}finally{busy=false}}
-function start(){clearInterval(timer);timer=setInterval(run,2500);setTimeout(run,500)}
+function getClient(c){if(!sbClient)sbClient=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});return sbClient}
+async function run(){if(busy)return;busy=true;try{const c=cfg();if(!c.url||!c.key||!window.supabase)return;const sb=getClient(c);const auth=await sb.auth.getSession();if(auth.error||!auth.data?.session)return;const q=await sb.from('school_kv').select('key,value,updated_at').in('key',[FEE,DEL]);if(q.error)throw q.error;const rows=new Map((q.data||[]).map(r=>[r.key,r]));const T=tomb();for(const [k,v] of Object.entries(O(rows.get(DEL)?.value)))if(Number(v?.deletedAt||0)>=Number(T[k]?.deletedAt||0))T[k]=v;harvest(J(localStorage.getItem(FEE)||'{}',{}),T);harvest(rows.get(FEE)?.value,T);localStorage.setItem(DEL,JSON.stringify(T));let u=await sb.from('school_kv').upsert({key:DEL,value:T,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error;const local=J(localStorage.getItem(FEE)||'{}',{}),cloud=rows.get(FEE)?.value||{};const merged=clean(mergeFees(local,cloud,T),T);const mergedText=JSON.stringify(merged),oldText=localStorage.getItem(FEE)||'{}';if(oldText!==mergedText){localStorage.setItem(FEE,mergedText);try{if(typeof fees!=='undefined')fees=merged}catch(e){}}if(JSON.stringify(cloud)!==mergedText){u=await sb.from('school_kv').upsert({key:FEE,value:merged,updated_at:new Date().toISOString()},{onConflict:'key'});if(u.error)throw u.error}try{renderFees?.();renderReceiptLedger?.();updateFeeDashboard?.();renderFeeStudentLedger?.();updateDash?.()}catch(e){}}catch(e){console.warn('V174 fee sync:',e)}finally{busy=false}}
+function start(){clearInterval(timer);timer=setInterval(run,10000);setTimeout(run,1200)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 window.v174FeeReconcile=run;window.v172FeeReconcile=run;window.v171FeeReconcile=run;
 })();</script>
