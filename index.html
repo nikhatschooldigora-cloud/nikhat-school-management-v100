@@ -2223,6 +2223,45 @@ function merge(a,b,preferLocal=false){
  }
  return clone(preferLocal?a:b);
 }
+
+// V163: Fees need a domain-specific merge. Fee data is a nested object
+// (student -> sessions -> txns), so a generic object merge can preserve stale
+// scalar values while still missing/overwriting transaction state. Merge every
+// student/session independently and union payment transactions by stable id or
+// receipt. This keeps both devices' payments and fee setup intact.
+function feeTxnKey(t){if(!t||typeof t!=='object')return null;return t.id?'id='+String(t.id):t.receipt?'receipt='+String(t.receipt):('tx='+JSON.stringify([t.date,t.amount,t.mode,t.studentId,t.note]));}
+function mergeFeeTxns(a,b,preferLocal){const aa=Array.isArray(a)?a:[],bb=Array.isArray(b)?b:[];const m=new Map();for(const t of aa){const k=feeTxnKey(t)||('anon:'+JSON.stringify(t));m.set(k,t)}for(const t of bb){const k=feeTxnKey(t)||('anon:'+JSON.stringify(t));m.set(k,m.has(k)?merge(m.get(k),t,preferLocal):t)}return [...m.values()].map(clone);}
+function mergeFeeRecord(a,b,preferLocal){
+ if(!a||typeof a!=='object')return clone(b||{}); if(!b||typeof b!=='object')return clone(a||{});
+ const o={};
+ for(const k of new Set([...Object.keys(a),...Object.keys(b)])){
+   if(k==='txns'){o[k]=mergeFeeTxns(a[k],b[k],preferLocal);continue}
+   if(k==='sessions'){
+     const sa=a[k]&&typeof a[k]==='object'&&!Array.isArray(a[k])?a[k]:{}, sb=b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])?b[k]:{};
+     const so={};
+     for(const sk of new Set([...Object.keys(sa),...Object.keys(sb)])){
+       const x=sa[sk],y=sb[sk];
+       if(x&&typeof x==='object'&&!Array.isArray(x)&&y&&typeof y==='object'&&!Array.isArray(y)){
+         const z={};
+         for(const q of new Set([...Object.keys(x),...Object.keys(y)])){
+           if(q==='txns')z[q]=mergeFeeTxns(x[q],y[q],preferLocal);
+           else z[q]=merge(x[q],y[q],preferLocal);
+         }
+         so[sk]=z;
+       }else so[sk]=merge(x,y,preferLocal);
+     }
+     o[k]=so;continue;
+   }
+   o[k]=merge(a[k],b[k],preferLocal);
+ }
+ return o;
+}
+function mergeFees(a,b,preferLocal){
+ const aa=a&&typeof a==='object'&&!Array.isArray(a)?a:{},bb=b&&typeof b==='object'&&!Array.isArray(b)?b:{};
+ const out={};
+ for(const sid of new Set([...Object.keys(aa),...Object.keys(bb)])){out[sid]=mergeFeeRecord(aa[sid],bb[sid],preferLocal)}
+ return out;
+}
 const LOCAL_CHANGE_META='nms_v162_local_change_meta';
 function localChangeMap(){try{return JSON.parse(localStorage.getItem(LOCAL_CHANGE_META)||'{}')||{}}catch(e){return {}}}
 function noteLocalChange(k){try{if(!k||k===CFG||k===LOCAL_CHANGE_META||k.startsWith('nms_v82_sync_')||k.startsWith('nms_v129_conflicts')||k.startsWith('nms_v131_'))return;const m=localChangeMap();m[k]=Date.now();localStorage.setItem(LOCAL_CHANGE_META,JSON.stringify(m))}catch(e){}}
@@ -2335,7 +2374,7 @@ async function sync(reason){
     const localAt=localChangedAt(k);
     const cloudAt=new Date(cr.updated_at||0).getTime()||0;
     const preferLocal=localAt>0&&localAt>cloudAt;
-    let merged=merge(lv,cv,preferLocal);
+    let merged=(k==='nms_fees')?mergeFees(lv,cv,preferLocal):merge(lv,cv,preferLocal);
     if(k==='nms_students')merged=stripStudents(merged);
     if(k==='nms_teachers')merged=stripTeachers(merged);
     if(k==='nms_users_v77')merged=sanitizeUsers(merged);
