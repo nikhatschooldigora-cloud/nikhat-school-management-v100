@@ -185,9 +185,9 @@ button,input,select{font:inherit}button{cursor:pointer;border:0}
 if(document.readyState!=='loading'){} else {}
 </script>
 
-<link rel="manifest" href="https://nikhatschooldigora-cloud.github.io/nikhat-school-management-v100/manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="192x192" href="https://nikhatschooldigora-cloud.github.io/nikhat-school-management-v100/icon-192.png">
-<link rel="apple-touch-icon" sizes="192x192" href="https://nikhatschooldigora-cloud.github.io/nikhat-school-management-v100/icon-192.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
 <meta name="application-name" content="Nikhat School">
 <meta name="theme-color" content="#0b5cff">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1364,7 +1364,7 @@ function populateFeeStudents(){const el=document.getElementById('feeStudent');if
 function renderFeeStudentLedger(){const el=document.getElementById('feeStudentLedger'),sid=document.getElementById('feeStudent')?.value;if(!el||!sid){if(el)el.innerHTML='Student ledger will appear here.';return}const s=students.find(x=>String(x.id)===String(sid));if(!s)return;const x=feeStudentSummary(s);el.innerHTML=`<div class="feeLedgerGrid"><div class="box"><small>Previous Session ${previousSessionKey()}</small><b>${money(x.previous.fee)}</b><span class="feeMini">Paid ${money(x.previous.paid)} • Due ${money(x.previous.due)}</span></div><div class="box"><small>Current Session ${feeSessionKey()}</small><b>${money(x.current.fee)}</b><span class="feeMini">Paid ${money(x.current.paid)} • Due ${money(x.current.due)}</span></div><div class="box"><small>Total Outstanding</small><b class="dangerText">${money(x.totalDue)}</b></div><div class="box"><small>Total Paid</small><b class="successText">${money(x.paid)}</b></div></div>`}
 function openFee(id=null){try{const modal=document.getElementById('feeModal');if(!modal)throw new Error('Fee form not found');populateFeeStudents();const dateEl=document.getElementById('feeDate'),amtEl=document.getElementById('feeAmount'),modeEl=document.getElementById('feeMode'),typeEl=document.getElementById('feePaymentType'),noteEl=document.getElementById('feeNote'),studentEl=document.getElementById('feeStudent');if(dateEl)dateEl.value=new Date().toISOString().slice(0,10);if(amtEl)amtEl.value='';if(modeEl)modeEl.value='Cash';if(typeEl)typeEl.value='both';if(noteEl)noteEl.value='';if(id&&studentEl)studentEl.value=String(id);renderFeeStudentLedger();modal.classList.remove('hidden');modal.style.display='flex';modal.setAttribute('aria-hidden','false');setTimeout(()=>{if(amtEl)amtEl.focus()},50)}catch(err){console.error(err);alert('Collect Fee open nahi ho pa raha. Error: '+(err&&err.message?err.message:err))}}
 function closeFeeModal(){const m=document.getElementById('feeModal');if(!m)return;m.classList.add('hidden');m.style.display='none';m.setAttribute('aria-hidden','true')}
-function saveFeeEntry(){try{const studentEl=document.getElementById('feeStudent'),amountEl=document.getElementById('feeAmount'),typeEl=document.getElementById('feePaymentType'),dateEl=document.getElementById('feeDate'),modeEl=document.getElementById('feeMode'),noteEl=document.getElementById('feeNote');if(!studentEl||!amountEl||!typeEl)throw new Error('Fee form fields missing');const sid=studentEl.value,amount=Number(String(amountEl.value||'').replace(/,/g,''));if(!sid)return alert('कृपया विद्यार्थी चुनें');if(!(amount>0))return alert('कृपया सही राशि भरें');const s=students.find(x=>String(x.id)===String(sid));if(!s)return alert('Student not found');const x=feeStudentSummary(s),type=typeEl.value;if(x.totalDue<=0)return alert('इस विद्यार्थी की कोई बकाया फीस नहीं है। पहले Previous Due या Current Fee सेट करें।');if(type==='previous'&&amount>x.previous.due)return alert('राशि पिछले सत्र के बकाये से अधिक है');if(type==='current'&&amount>x.current.due)return alert('राशि वर्तमान सत्र के बकाये से अधिक है');if(type==='both'&&amount>x.totalDue)return alert('जमा राशि कुल बकाये से अधिक है');let prevAmt=0,curAmt=0;if(type==='previous')prevAmt=amount;else if(type==='current')curAmt=amount;else{prevAmt=Math.min(amount,x.previous.due);curAmt=Math.min(amount-prevAmt,x.current.due)}if(prevAmt+curAmt!==amount)return alert('राशि allocation में समस्या है। कृपया दोबारा प्रयास करें।');const rec=ensureCurrentFeeSession(sid),cur=rec.sessions[feeSessionKey()],receipt='REC'+new Date().getFullYear()+String(Date.now()).slice(-6),base={id:uid()+'f',receipt,date:(dateEl&&dateEl.value)||new Date().toISOString().slice(0,10),amount,mode:(modeEl&&modeEl.value)||'Cash',note:(noteEl&&noteEl.value||'').trim(),previousAmount:prevAmt,currentAmount:curAmt,allocated:'both',session:feeSessionKey(),studentId:sid};cur.txns.push(base);save();closeFeeModal();renderFees();updateFeeDashboard();alert(`Fee saved. Receipt No: ${receipt}\nPrevious Session: ${money(prevAmt)}\nCurrent Session: ${money(curAmt)}`)}catch(err){console.error('saveFeeEntry error',err);alert('Fee save nahi ho pa rahi. Error: '+(err&&err.message?err.message:err))}}
+function saveFeeEntry(){try{const studentEl=document.getElementById('feeStudent'),amountEl=document.getElementById('feeAmount'),typeEl=document.getElementById('feePaymentType'),dateEl=document.getElementById('feeDate'),modeEl=document.getElementById('feeMode'),noteEl=document.getElementById('feeNote');if(!studentEl||!amountEl||!typeEl)throw new Error('Fee form fields missing');const sid=studentEl.value,amount=Number(String(amountEl.value||'').replace(/,/g,''));if(!sid)return alert('कृपया विद्यार्थी चुनें');if(!(amount>0))return alert('कृपया सही राशि भरें');const s=students.find(x=>String(x.id)===String(sid));if(!s)return alert('Student not found');const x=feeStudentSummary(s),type=typeEl.value;if(x.totalDue<=0)return alert('इस विद्यार्थी की कोई बकाया फीस नहीं है। पहले Previous Due या Current Fee सेट करें।');if(type==='previous'&&amount>x.previous.due)return alert('राशि पिछले सत्र के बकाये से अधिक है');if(type==='current'&&amount>x.current.due)return alert('राशि वर्तमान सत्र के बकाये से अधिक है');if(type==='both'&&amount>x.totalDue)return alert('जमा राशि कुल बकाये से अधिक है');let prevAmt=0,curAmt=0;if(type==='previous')prevAmt=amount;else if(type==='current')curAmt=amount;else{prevAmt=Math.min(amount,x.previous.due);curAmt=Math.min(amount-prevAmt,x.current.due)}if(prevAmt+curAmt!==amount)return alert('राशि allocation में समस्या है। कृपया दोबारा प्रयास करें।');const rec=ensureCurrentFeeSession(sid),cur=rec.sessions[feeSessionKey()],now=Date.now(),receipt='REC'+new Date().getFullYear()+String(now).slice(-6),base={id:uid()+'f',receipt,updatedAt:now,date:(dateEl&&dateEl.value)||new Date().toISOString().slice(0,10),amount,mode:(modeEl&&modeEl.value)||'Cash',note:(noteEl&&noteEl.value||'').trim(),previousAmount:prevAmt,currentAmount:curAmt,allocated:'both',session:feeSessionKey(),studentId:sid};cur.txns.push(base);save();closeFeeModal();renderFees();updateFeeDashboard();alert(`Fee saved. Receipt No: ${receipt}\nPrevious Session: ${money(prevAmt)}\nCurrent Session: ${money(curAmt)}`)}catch(err){console.error('saveFeeEntry error',err);alert('Fee save nahi ho pa rahi. Error: '+(err&&err.message?err.message:err))}}
 function feeClone(v){try{return JSON.parse(JSON.stringify(v))}catch(e){return v}}
 function stampFeeField(rec,key,field){try{if(!rec||!rec.sessions||!rec.sessions[key])return;rec._syncMeta=rec._syncMeta&&typeof rec._syncMeta==='object'?rec._syncMeta:{};rec._syncMeta[key]=rec._syncMeta[key]&&typeof rec._syncMeta[key]==='object'?rec._syncMeta[key]:{};rec._syncMeta[key][field]=Date.now()}catch(e){}}
 function mergeFeeRecordsSafe(a,b){
@@ -1390,14 +1390,12 @@ function mergeFeeRecordsSafe(a,b){
     const ma=(A._syncMeta||{})[k]||{}, mb=(B._syncMeta||{})[k]||{}, mm={...ma,...mb};
     for(const f of ['fee','openingDue','manualDue']){
       const ta=Number(ma[f]||0), tb=Number(mb[f]||0);
-      if(tb>ta)so[f]=sb[f];
-      else if(ta>tb)so[f]=sa[f];
-      else if(ta===0&&tb===0){
-        const av=Number(sa[f]),bv=Number(sb[f]);
-        if(f==='manualDue'&&(sa.openingDue!==undefined||sb.openingDue!==undefined))so.manualDue=0;
-        else if(av===0&&bv!==0)so[f]=sb[f];
-        else if(bv===0&&av!==0)so[f]=sa[f];
-        else if(av!==bv&&Number.isFinite(av)&&Number.isFinite(bv))so[f]=Math.max(av,bv);
+      if(ta>0 || tb>0){
+        if(tb>=ta && sb[f]!==undefined)so[f]=sb[f];
+        else if(sa[f]!==undefined)so[f]=sa[f];
+      }else{
+        if(sa[f]===undefined && sb[f]!==undefined)so[f]=sb[f];
+        else if(sb[f]===undefined && sa[f]!==undefined)so[f]=sa[f];
       }
     }
     if(so.openingDue!==undefined)so.manualDue=0;
@@ -2346,6 +2344,32 @@ function authInfo(){if(!client)return;client.auth.getSession().then(r=>{if(r.dat
 async function login(){try{if(!client&&!initClient())return;const email=(document.getElementById('v80Email')?.value||'').trim(),password=document.getElementById('v80Password')?.value||'';if(!email||!password)return alert('Cloud email और password भरें.');const r=await client.auth.signInWithPassword({email,password});if(r.error)throw r.error;status(true,'Connected + Logged in');info('syncing...');schedule('login');alert('Cloud Login successful. Auto Sync चालू है.')}catch(e){alert('Cloud Login failed: '+e.message)}}
 async function logout(){if(client)await client.auth.signOut();status(true,'Connected — Logged out');info('login required')}
 function schedule(reason){clearTimeout(timer);timer=setTimeout(()=>sync(reason),500)}
+async function syncFeesCAS(localFees, localStudents){
+  // Optimistic concurrency for nms_fees: re-read before every write and only
+  // update the row if its updated_at is still the value we read. If another
+  // device wins the race, the update affects zero rows, so we re-read, merge
+  // again, and retry. This prevents a stale whole-record upsert from erasing
+  // a concurrent receipt or fee change.
+  const MAX=6;
+  for(let attempt=1;attempt<=MAX;attempt++){
+    const r=await client.from('school_kv').select('value,updated_at').eq('key','nms_fees').maybeSingle();
+    if(r.error)throw r.error;
+    const cv=(r.data&&r.data.value&&typeof r.data.value==='object'&&!Array.isArray(r.data.value))?r.data.value:{};
+    const merged=mergeFeesSafe(localFees||{},cv,localStudents||[],localStudents||[]);
+    if(same(merged,cv))return {value:merged,written:false,attempt};
+    const stamp=r.data?.updated_at||null;
+    if(stamp){
+      const u=await client.from('school_kv').update({value:clone(merged),updated_at:new Date().toISOString()}).eq('key','nms_fees').eq('updated_at',stamp).select('key,updated_at').maybeSingle();
+      if(u.error)throw u.error;
+      if(u.data)return {value:merged,written:true,attempt};
+      continue;
+    }
+    const ins=await client.from('school_kv').insert({key:'nms_fees',value:clone(merged),updated_at:new Date().toISOString()}).select('key,updated_at').maybeSingle();
+    if(!ins.error&&ins.data)return {value:merged,written:true,attempt};
+  }
+  throw new Error('nms_fees concurrent update could not be safely reconciled after '+MAX+' retries');
+}
+
 async function sync(reason){
  if(busy)return; busy=true;
  try{
@@ -2410,6 +2434,13 @@ async function sync(reason){
    if(k==='nms_sync_deleted')continue;
    try{
    const cr=cloud.get(k);
+   if(k==='nms_fees'){
+    const localFees=read('nms_fees')||{};
+    const fr=await syncFeesCAS(localFees,mergedStudentsForSync);
+    if(!same(fr.value,localFees)){if(setLocal('nms_fees',fr.value)){applyMemory('nms_fees',fr.value);changed.push('nms_fees')}}
+    if(fr.written)pushed++;
+    continue;
+   }
    const originalLv=read(k);
    let lv=originalLv, cv=cr?cr.value:null;
    // V140: apply cloud tombstones to the existing device immediately.
@@ -2452,7 +2483,7 @@ async function sync(reason){
      if(u.error){syncErrors.push({key:k,error:u.error});}else pushed++;
     }
    }
-   }catch(keyErr){syncErrors.push({key:k,error:keyErr});console.warn('V159 V8 sync key failed:',k,keyErr)}
+   }catch(keyErr){syncErrors.push({key:k,error:keyErr});console.warn('V159 V11 sync key failed:',k,keyErr)}
   }
 
   const finalUsers=sanitizeUsers(read('nms_users_v77'));
@@ -2481,16 +2512,20 @@ async function sync(reason){
    }
   }
   if(changed.length)refresh(changed);
-  if(syncErrors.length){const first=syncErrors[0]?.error||{};const msg=String(first.message||first.details||first.hint||first.code||first).slice(0,180);status(true,'Connected + Logged in • Sync Partial');info('sync partial • '+syncErrors.length+' error(s) • '+msg);console.warn('V159 V8 sync partial errors:',syncErrors);}else{status(true,'Connected + Logged in');info('V159 V8 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');}
+  if(syncErrors.length){const first=syncErrors[0]?.error||{};const msg=String(first.message||first.details||first.hint||first.code||first).slice(0,180);status(true,'Connected + Logged in • Sync Partial');info('sync partial • '+syncErrors.length+' error(s) • '+msg);console.warn('V159 V11 sync partial errors:',syncErrors);}else{status(true,'Connected + Logged in');info('V159 V11 • synced '+rows.length+' cloud items'+(pushed?' • '+pushed+' update(s) pushed':'')+' • no page refresh');}
  }catch(e){
-  console.warn('V159 V8 sync:',e); status(false,'Connected + Logged in • Sync Error');
+  console.warn('V159 V10 sync:',e); status(false,'Connected + Logged in • Sync Error');
   info('sync error • '+String(e.message||e).slice(0,180));
  }finally{busy=false}
 }
 function applyMemory(k,v){try{if(k==='nms_students'){students=Array.isArray(v)?v:[];normalizeStudents?.()}else if(k==='nms_teachers'){teachers=Array.isArray(v)?v:[]}else if(k==='nms_fees'){fees=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}else if(k==='nms_attendance'){attendance=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}else if(k==='nms_marks'){marks=v&&typeof v==='object'&&!Array.isArray(v)?v:{}}}catch(e){}}
 async function upload(){return sync('manual upload')}
-async function download(){try{await session();const r=await client.from('school_kv').select('key,value,updated_at').order('key');if(r.error)throw r.error;if(!r.data?.length)return alert('Cloud database खाली है.');if(!confirm('Cloud data को इस device में replace करना है?'))return;applying=true;try{for(const x of r.data){if(x.key===CFG)continue;localStorage.setItem(x.key,typeof x.value==='string'?x.value:JSON.stringify(x.value))}}finally{applying=false}location.reload()}catch(e){alert('Download failed: '+e.message)}}
-async function initializeCloud(){try{await session();const keys=cloudKeys();let n=0;for(const k of keys){const lv=read(k);if(lv!==null){const r=await client.from('school_kv').upsert({key:k,value:clone(lv),updated_at:new Date().toISOString()},{onConflict:'key'});if(r.error)throw r.error;n++}}status(true,'Cloud Initialized • '+n+' items');info('cloud initialized');alert('Cloud initialization हो गया: '+n+' items.')}catch(e){alert('Cloud initialization failed: '+e.message)}}
+// V11 Safe Manual Download: NEVER replace local school data. Reconcile through the
+// same merge/CAS pipeline used by Auto Sync, with nms_fees protected by CAS.
+async function download(){try{await session();if(!confirm('Cloud data को इस device में merge करना है? Existing local fees/receipts को replace नहीं किया जाएगा.'))return;await sync('manual download merge');alert('Cloud data safe merge हो गया. Existing local fees/receipts को replace नहीं किया गया.')}catch(e){alert('Safe download/merge failed: '+e.message)}}
+// V11 Safe Cloud Initialize: do not blindly upsert local snapshots. The normal
+// reconciliation path creates missing cloud keys and CAS-merges nms_fees.
+async function initializeCloud(){try{await session();if(!confirm('Cloud initialize करना है? Existing cloud/local fees और receipts को safe merge किया जाएगा; blind overwrite नहीं होगा.'))return;await sync('safe cloud initialize');alert('Cloud safe initialization/merge complete. Existing data को blind overwrite नहीं किया गया.')}catch(e){alert('Safe cloud initialization failed: '+e.message)}}
 function init(){applyConfigFromLink();const u=document.getElementById('v80Url'),k=document.getElementById('v80Key'),c=cfg();if(u)u.value=c.url||'';if(k)k.value=c.key||'';document.getElementById('v80Connect')?.addEventListener('click',saveCfg);document.getElementById('v80Login')?.addEventListener('click',login);document.getElementById('v80Logout')?.addEventListener('click',logout);document.getElementById('v80Upload')?.addEventListener('click',upload);document.getElementById('v80Download')?.addEventListener('click',download);document.getElementById('v122InitializeCloud')?.addEventListener('click',initializeCloud);document.getElementById('v134ShareSetup')?.addEventListener('click',shareCloudSetup);document.getElementById('v123SyncNow')?.addEventListener('click',()=>sync('manual button'));if(initClient())authInfo();setTimeout(()=>sync('startup'),900);window.addEventListener('online',()=>schedule('online'));document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule('visible')});setInterval(()=>{if(document.visibilityState==='visible'&&!busy)schedule('background')},10000)}
 // Track user-created local changes. A cloud-applied write is shielded by `applying`.
 (function patchStorage(){if(window.__v131StoragePatched)return;window.__v131StoragePatched=true;const os=Storage.prototype.setItem,or=Storage.prototype.removeItem;Storage.prototype.setItem=function(k,v){os.call(this,k,v);if(this===localStorage&&!applying&&k&&k.startsWith(PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict')&&!k.startsWith('nms_v129_conflicts')&&!k.startsWith('nms_v131_'))schedule('local change')};Storage.prototype.removeItem=function(k){or.call(this,k);if(this===localStorage&&!applying&&k&&k.startsWith(PREFIX)&&k!==CFG&&!k.startsWith('nms_v82_sync_')&&!k.startsWith('nms_v82_conflict')&&!k.startsWith('nms_v129_conflicts')&&!k.startsWith('nms_v131_'))schedule('local delete')}})();
